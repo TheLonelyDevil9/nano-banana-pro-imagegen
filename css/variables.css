@@ -1,0 +1,95 @@
+/* ==========================================================================
+   CSS Variables - Design Tokens
+   ========================================================================== */
+
+:root {
+  /* Colors - Brand */
+  --color-primary: #eab308;
+  --color-primary-hover: #ca9a06;
+  --color-primary-dark: #444;
+  
+  /* Colors - Semantic */
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-error-hover: #dc2626;
+  --color-cancel: #dc2626;
+  --color-cancel-hover: #b91c1c;
+  --color-iterate: #1d4ed8;
+  --color-iterate-hover: #1e40af;
+  --color-refresh: #059669;
+  --color-refresh-hover: #047857;
+  
+  /* Colors - Background */
+  --bg-body: #000;
+  --bg-surface: #111;
+  --bg-surface-alt: #1a1a1a;
+  --bg-elevated: #222;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+  --bg-overlay-dark: rgba(0, 0, 0, 0.9);
+  --bg-overlay-darker: rgba(0, 0, 0, 0.98);
+  
+  /* Colors - Border */
+  --border-default: #333;
+  --border-hover: #444;
+  --border-focus: var(--color-primary);
+  
+  /* Colors - Text */
+  --text-primary: #fff;
+  --text-secondary: #aaa;
+  --text-muted: #888;
+  --text-dim: #666;
+  --text-placeholder: #555;
+  --text-disabled: #444;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 10px;
+  --spacing-lg: 12px;
+  --spacing-xl: 16px;
+  --spacing-2xl: 20px;
+  --spacing-3xl: 30px;
+  
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 50%;
+  
+  /* Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-size-xs: 0.6rem;
+  --font-size-sm: 0.65rem;
+  --font-size-base: 0.7rem;
+  --font-size-md: 0.75rem;
+  --font-size-lg: 0.8rem;
+  --font-size-xl: 0.85rem;
+  --font-size-2xl: 0.9rem;
+  --font-size-3xl: 1rem;
+  --font-size-4xl: 1.25rem;
+  --font-size-input: 16px;
+  
+  /* Transitions */
+  --transition-fast: 0.2s;
+  --transition-normal: 0.3s;
+  
+  /* Z-index */
+  --z-overlay: 140;
+  --z-history: 150;
+  --z-preview: 200;
+  --z-fullscreen: 300;
+  --z-fullscreen-controls: 310;
+  
+  /* Sizes */
+  --ref-thumb-size: 70px;
+  --switch-width: 44px;
+  --switch-height: 24px;
+  --switch-knob: 18px;
+  --container-max-width: 600px;
+  --container-max-width-desktop: 1400px;
+  --container-max-width-xl: 1600px;
+  --left-panel-width: 420px;
+  --left-panel-width-xl: 480px;
+  --history-panel-max-width: 400px;
+}

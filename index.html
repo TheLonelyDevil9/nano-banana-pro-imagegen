@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Nano Banana Pro</title>
+  
+  <!-- jsrsasign for JWT signing in browser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js"></script>
+  
+  <!-- CSS Modules -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/modals.css">
+  <link rel="stylesheet" href="css/utilities.css">
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🍌 Gemini ImageGen 🍌</h1>
+      <button class="btn-secondary" onclick="toggleHistory()">History</button>
+    </div>
+    
+    <!-- Desktop Layout Wrapper -->
+    <div class="desktop-layout">
+      <!-- Left Panel: Controls -->
+      <div class="left-panel">
+        <!-- About / Features (Collapsible) -->
+        <div class="collapsible collapsed" id="aboutCollapsible">
+          <div class="collapsible-header" onclick="toggleCollapsible('aboutCollapsible')">
+            <label>About & Features</label>
+            <span class="collapsible-chevron">▼</span>
+          </div>
+          <div class="collapsible-body" style="font-size:0.75rem;color:#888;line-height:1.6;">
+            <div style="margin-bottom:8px;color:#eab308;font-weight:600;">Nano Banana Pro ImageGen v2.0</div>
+            <div style="margin-bottom:12px;">A feature-rich Gemini image generation client with dual auth support.</div>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">🔐 Authentication</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>API Key authentication</li>
+                <li>Vertex AI with Service Account JSON</li>
+                <li>Auto-refresh tokens & retry on auth errors</li>
+                <li>API key visibility toggle (👁️)</li>
+              </ul>
+            </details>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">🖼️ Image Generation</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>All Gemini image models</li>
+                <li>Configurable aspect ratio with visual preview</li>
+                <li>1K / 2K / 4K resolution selection</li>
+                <li>Thinking mode with adjustable budget</li>
+                <li>Google Search grounding</li>
+                <li>Auto-retry with exponential backoff</li>
+                <li>Generation time estimation</li>
+                <li>Regenerate button for quick iterations</li>
+              </ul>
+            </details>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">📷 Reference Images</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>Up to 14 reference images</li>
+                <li>Auto-compression on import (max 2048px)</li>
+                <li>Numbered ordering badges</li>
+                <li>Paste from clipboard support</li>
+                <li>Iterate: add generated image to refs</li>
+                <li>Undo clear with 5-second restore</li>
+              </ul>
+            </details>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">📜 History & Favorites</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>IndexedDB persistent storage</li>
+                <li>Thumbnail generation for fast loading</li>
+                <li>Infinite scroll pagination</li>
+                <li>Star/favorite system</li>
+                <li>Filter by favorites</li>
+                <li>Clear all (preserves favorites)</li>
+                <li>Delete individual items</li>
+                <li>Load prompt from history</li>
+              </ul>
+            </details>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">🔍 Image Viewing</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>Pinch-to-zoom (mobile)</li>
+                <li>Mouse wheel zoom (desktop)</li>
+                <li>Pan when zoomed</li>
+                <li>Double-tap/click to reset</li>
+                <li>Fullscreen modal with zoom controls</li>
+                <li>Download & copy to clipboard</li>
+              </ul>
+            </details>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">📱 Mobile Features</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>Swipe up on image to iterate</li>
+                <li>Swipe down in fullscreen to close</li>
+                <li>Haptic feedback (vibration)</li>
+                <li>Touch-optimized UI</li>
+              </ul>
+            </details>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">💾 Persistence</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>All inputs auto-saved</li>
+                <li>Model memory (last used)</li>
+                <li>Collapsible section states</li>
+                <li>Settings preferences</li>
+                <li>Reference images preserved</li>
+              </ul>
+            </details>
+
+            <details style="margin-bottom:8px;">
+              <summary style="cursor:pointer;color:#aaa;">📊 Stats & Feedback</summary>
+              <ul style="margin:8px 0 0 16px;padding:0;">
+                <li>Generation counter (session)</li>
+                <li>Estimated token usage</li>
+                <li>Prompt character counter</li>
+                <li>Sound notification on complete</li>
+                <li>User-friendly error messages</li>
+                <li>Smooth scroll to result</li>
+              </ul>
+            </details>
+
+            <div style="margin-top:12px;padding-top:8px;border-top:1px solid #333;color:#555;font-size:0.65rem;">
+              Built with vanilla HTML/CSS/JS • No build tools required
+            </div>
+          </div>
+        </div>
+        
+        <!-- Authentication -->
+        <div class="collapsible" id="authCollapsible">
+          <div class="collapsible-header" onclick="toggleCollapsible('authCollapsible')">
+            <label>Authentication</label>
+            <span class="collapsible-chevron">▼</span>
+          </div>
+          <div class="collapsible-body">
+            <div class="auth-tabs">
+              <div class="auth-tab active" data-mode="apikey" onclick="switchAuthMode('apikey')">API Key</div>
+              <div class="auth-tab" data-mode="vertex" onclick="switchAuthMode('vertex')">Vertex AI</div>
+            </div>
+            <div class="auth-content">
+              <!-- API Key Panel -->
+              <div class="auth-panel active" id="apikeyPanel">
+                <div class="api-key-row">
+                  <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
+                  <button class="btn-toggle-visibility" onclick="toggleApiKeyVisibility()" title="Show/Hide">👁️</button>
+                </div>
+              </div>
+              <!-- Vertex AI Panel -->
+              <div class="auth-panel" id="vertexPanel">
+                <input type="file" id="saFileInput" class="file-hidden" accept=".json" onchange="handleSAFile(this.files[0])">
+                <div class="file-drop-zone" id="saDropZone" onclick="document.getElementById('saFileInput').click()">
+                  <div>📁 Drop service account JSON here</div>
+                </div>
+                <div class="sa-info" id="saInfo"></div>
+                <!-- Hidden fields - auto-populated from service account -->
+                <input type="hidden" id="projectId">
+                <input type="hidden" id="vertexLocation" value="global">
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Model Selection -->
+        <div>
+          <label>Model</label>
+          <div class="model-row">
+            <select id="modelSelect">
+              <option value="">Enter credentials to load models...</option>
+            </select>
+            <button class="btn-refresh" id="refreshBtn" onclick="refreshModels()">⟳</button>
+          </div>
+          <div class="model-status" id="modelStatus"></div>
+        </div>
+        
+        <!-- Reference Images -->
+        <div class="ref-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <label>Reference Images <span id="refCount"></span> <span style="color:#666;font-size:0.6rem;">(max 14)</span></label>
+            <button class="btn-secondary" id="clearRefsBtn" onclick="clearRefs()" style="padding:4px 8px;font-size:0.7rem;">Clear All</button>
+          </div>
+          <input type="file" id="refInput" class="file-hidden" accept="image/*" multiple onchange="addRefImages(this.files)">
+          <div class="ref-grid" id="refGrid">
+            <button class="ref-add" onclick="document.getElementById('refInput').click()">+</button>
+          </div>
+        </div>
+        
+        <!-- Prompt -->
+        <div>
+          <label>Prompt</label>
+          <div class="prompt-wrapper">
+            <textarea id="prompt" placeholder="Describe the image..."></textarea>
+            <span class="char-counter" id="charCounter">0</span>
+          </div>
+        </div>
+        
+        <!-- Aspect Ratio & Resolution -->
+        <div class="row">
+          <div style="flex:1;">
+            <label>Aspect Ratio</label>
+            <div style="display:flex;align-items:center;">
+              <select id="ratio" style="flex:1;">
+                <option value="">Auto</option>
+                <option value="1:1">1:1</option>
+                <option value="3:2">3:2</option>
+                <option value="2:3">2:3</option>
+                <option value="4:3">4:3</option>
+                <option value="3:4">3:4</option>
+                <option value="4:5">4:5</option>
+                <option value="5:4">5:4</option>
+                <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
+                <option value="21:9">21:9 (Ultrawide)</option>
+              </select>
+              <div class="aspect-preview" id="aspectPreview">
+                <div class="aspect-preview-inner" id="aspectPreviewInner"></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label>Resolution</label>
+            <select id="resolution">
+              <option value="1K">1K</option>
+              <option value="2K">2K</option>
+              <option value="4K" selected>4K</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Advanced Options (Collapsible) -->
+        <div class="collapsible" id="advancedCollapsible">
+          <div class="collapsible-header" onclick="toggleCollapsible('advancedCollapsible')">
+            <label>Advanced Options</label>
+            <span class="collapsible-chevron">▼</span>
+          </div>
+          <div class="collapsible-body">
+            <div class="toggle-row">
+              <div class="toggle-item">
+                <label>Search</label>
+                <label class="switch"><input type="checkbox" id="searchToggle"><span class="slider"></span></label>
+              </div>
+              <div class="toggle-item">
+                <label>Thinking</label>
+                <label class="switch"><input type="checkbox" id="thinkingToggle" checked><span class="slider"></span></label>
+              </div>
+            </div>
+            <div id="thinkingRow">
+              <label>Thinking Budget: <span id="thinkingLabel">Auto</span></label>
+              <div class="thinking-row" style="display:flex;gap:10px;align-items:center;">
+                <input type="range" id="thinkingBudget" min="-1" max="24576" value="-1">
+              </div>
+              <div id="thinkingNote" style="font-size:0.65rem;color:#666;margin-top:4px;display:none;">
+                ℹ️ Gemini 3 Pro always uses thinking (cannot be disabled)
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Settings (Collapsible) -->
+        <div class="collapsible collapsed" id="settingsCollapsible">
+          <div class="collapsible-header" onclick="toggleCollapsible('settingsCollapsible')">
+            <label>Settings</label>
+            <span class="collapsible-chevron">▼</span>
+          </div>
+          <div class="collapsible-body">
+            <div class="settings-row">
+              <span class="settings-label">Sound on complete</span>
+              <label class="switch"><input type="checkbox" id="soundToggle"><span class="slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label">Haptic feedback</span>
+              <label class="switch"><input type="checkbox" id="hapticToggle" checked><span class="slider"></span></label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Conversation Indicator -->
+        <div class="conversation-row">
+          <span id="conversationIndicator" style="font-size:0.7rem;color:#888;display:none;"></span>
+          <button class="btn-secondary" id="clearConversationBtn" onclick="clearConversation()" style="padding:4px 8px;font-size:0.65rem;display:none;">🔄 New Chat</button>
+        </div>
+        
+        <!-- Generate Button -->
+        <button class="btn-primary" id="generateBtn" onclick="generate()">Generate Image</button>
+        <button class="btn-cancel hidden" id="cancelBtn" onclick="cancelGeneration()">Cancel Generation</button>
+      </div>
+      <!-- End Left Panel -->
+
+      <!-- Right Panel: Image Display -->
+      <div class="right-panel">
+        <div class="error hidden" id="error"></div>
+        <div class="grounding-info hidden" id="groundingInfo"></div>
+        
+        <div class="image-box" id="imageBox">
+          <div class="placeholder" id="placeholder">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+            </svg>
+            <div>Ready to create!</div>
+            <div class="time-estimate hidden" id="timeEstimate"></div>
+          </div>
+          <div class="spinner hidden" id="spinner"></div>
+          <img id="resultImg" class="hidden" alt="Generated">
+          <div class="zoom-hint">Pinch to zoom • Double-tap reset</div>
+        </div>
+        
+        <div class="actions">
+          <button class="btn-iterate" id="iterateBtn" onclick="iterate()" disabled>Iterate</button>
+          <button class="btn-secondary" id="regenerateBtn" onclick="regenerate()" disabled>🔄</button>
+          <button class="btn-secondary" id="clearOutputBtn" onclick="clearOutput()" disabled title="Clear Output">🗑</button>
+          <button class="btn-secondary" id="downloadBtn" onclick="download()" disabled>Download</button>
+          <button class="btn-secondary" id="copyBtn" onclick="copyImg()" disabled>Copy</button>
+        </div>
+        
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+          <div class="stat-item">🖼️ <span class="stat-value" id="genCountStat">0</span> generated</div>
+          <div class="stat-item">📊 ~<span class="stat-value" id="tokenStat">0</span> tokens</div>
+        </div>
+      </div>
+      <!-- End Right Panel -->
+    </div>
+    <!-- End Desktop Layout -->
+  </div>
+  
+  <!-- Undo Toast -->
+  <div class="undo-toast" id="undoToast">
+    <span>References cleared</span>
+    <button onclick="undoClearRefs()">Undo</button>
+  </div>
+
+  <!-- Audio for notification sound -->
+  <audio id="notificationSound" preload="auto"></audio>
+  
+  <!-- Overlay -->
+  <div class="overlay" id="overlay" onclick="toggleHistory()"></div>
+  
+  <!-- History Panel -->
+  <div class="history-panel" id="historyPanel">
+    <div class="history-header">
+      <h2>History</h2>
+      <button class="close-btn" onclick="toggleHistory()">×</button>
+    </div>
+    <div class="history-filter">
+      <button class="filter-btn active" id="filterAll" onclick="setHistoryFilter('all')">All</button>
+      <button class="filter-btn" id="filterFavorites" onclick="setHistoryFilter('favorites')">★ Favorites</button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="history-empty">No images yet</div>
+    </div>
+    <div class="history-actions">
+      <button class="btn-secondary" onclick="clearHistory()" style="width:100%;">Clear All (keeps ★)</button>
+    </div>
+  </div>
+  
+  <!-- Toast -->
+  <div class="toast hidden" id="toast"></div>
+  
+  <!-- Fullscreen Image Modal -->
+  <div class="fullscreen-modal" id="fullscreenModal">
+    <button class="fullscreen-close" onclick="closeFullscreen()">×</button>
+    <div class="fullscreen-img-container" id="fullscreenContainer">
+      <img id="fullscreenImg" src="" alt="Fullscreen">
+    </div>
+    <div class="fullscreen-zoom-level" id="fullscreenZoomLevel">100%</div>
+    <div class="fullscreen-controls">
+      <button onclick="fsZoomOut()" title="Zoom Out">−</button>
+      <button onclick="fsResetZoom()" title="Reset">⟲</button>
+      <button onclick="fsZoomIn()" title="Zoom In">+</button>
+    </div>
+    <div class="fullscreen-hint">Scroll to zoom • Drag to pan • Double-click to reset</div>
+  </div>
+  
+  <!-- History Preview Modal -->
+  <div class="preview-modal" id="previewModal" onclick="closePreview(event)">
+    <div class="preview-content" onclick="event.stopPropagation()">
+      <img class="preview-img" id="previewImg" src="" alt="Preview">
+      <div class="preview-prompt" id="previewPrompt"></div>
+      <div class="preview-actions">
+        <button class="btn-primary" onclick="useHistoryItem()">Use Prompt & Image</button>
+        <button class="btn-secondary" onclick="downloadPreview()">Download</button>
+        <button class="btn-secondary" onclick="closePreview()">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- JavaScript Modules -->
+  <script type="module" src="js/app.js"></script>
+</body>
+
+</html>

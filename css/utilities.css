@@ -1,0 +1,104 @@
+/* ==========================================================================
+   Utility Styles - Animations, Helpers, Toast
+   ========================================================================== */
+
+/* Hidden */
+.hidden {
+    display: none !important;
+}
+
+/* Spinner */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-default);
+    border-top-color: var(--color-primary);
+    border-radius: var(--radius-full);
+    animation: spin 1s linear infinite;
+}
+
+/* Animations */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+}
+
+/* Toast */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hover);
+    padding: var(--spacing-md) 18px;
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-xl);
+    z-index: var(--z-preview);
+    animation: fadeIn var(--transition-normal);
+}
+
+/* Undo Toast */
+.undo-toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--border-default);
+    color: var(--text-primary);
+    padding: var(--spacing-lg) var(--spacing-2xl);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    z-index: var(--z-history);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-normal);
+}
+
+.undo-toast.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.undo-toast button {
+    background: var(--color-primary);
+    color: #000;
+    border: none;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Swipe hint */
+.swipe-hint {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    background: linear-gradient(to left, var(--color-error), transparent);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: var(--spacing-lg);
+    color: var(--text-primary);
+    font-size: var(--font-size-lg);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-fast);
+}
+
+.history-item.swiping .swipe-hint {
+    opacity: 1;
+}

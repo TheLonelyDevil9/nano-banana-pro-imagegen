@@ -1,0 +1,190 @@
+/* ==========================================================================
+   Layout Styles - Container, Panels, Responsive Grid
+   ========================================================================== */
+
+/* Container */
+.container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-xl);
+    gap: var(--spacing-md);
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Mobile: panels are just flow containers */
+.desktop-layout {
+    display: contents;
+}
+
+.left-panel,
+.right-panel {
+    display: contents;
+}
+
+/* Collapsible Sections */
+.collapsible {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.collapsible-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--bg-surface-alt);
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.collapsible-header:hover {
+    background: var(--bg-elevated);
+}
+
+.collapsible-header label {
+    pointer-events: none;
+    margin: 0;
+}
+
+.collapsible-chevron {
+    transition: transform var(--transition-normal);
+    color: var(--text-dim);
+}
+
+.collapsible.collapsed .collapsible-chevron {
+    transform: rotate(-90deg);
+}
+
+.collapsible-body {
+    max-height: 500px;
+    overflow: hidden;
+    transition: max-height var(--transition-normal) ease, padding var(--transition-normal) ease;
+    padding: var(--spacing-lg);
+    background: var(--bg-surface);
+}
+
+.collapsible.collapsed .collapsible-body {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* ========== DESKTOP SPLIT LAYOUT ========== */
+@media (min-width: 1024px) {
+    .container {
+        max-width: var(--container-max-width-desktop);
+        padding: var(--spacing-2xl) var(--spacing-3xl);
+    }
+
+    .desktop-layout {
+        display: flex;
+        gap: var(--spacing-3xl);
+        flex: 1;
+        min-height: 0;
+    }
+
+    .left-panel {
+        flex: 0 0 var(--left-panel-width);
+        max-width: var(--left-panel-width);
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-md);
+        padding-right: 15px;
+        align-self: flex-start;
+    }
+
+    body {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .left-panel::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .left-panel::-webkit-scrollbar-track {
+        background: var(--bg-surface);
+    }
+
+    .left-panel::-webkit-scrollbar-thumb {
+        background: var(--border-default);
+        border-radius: 3px;
+    }
+
+    .right-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-lg);
+        min-width: 0;
+    }
+
+    .right-panel .image-box {
+        flex: 1;
+        min-height: 400px;
+        max-height: calc(100vh - 220px);
+    }
+
+    .right-panel .actions {
+        justify-content: center;
+        gap: var(--spacing-lg);
+    }
+
+    .right-panel .stats-bar {
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    /* Adjust image box for desktop */
+    .image-box {
+        aspect-ratio: auto;
+    }
+
+    /* Make header span full width in desktop */
+    .header {
+        margin-bottom: var(--spacing-md);
+    }
+
+    /* Hide mobile-only elements on desktop if needed */
+    .zoom-hint {
+        display: none;
+    }
+
+    /* Better button layout on desktop */
+    .actions button {
+        min-width: 80px;
+    }
+
+    .btn-iterate {
+        min-width: 100px;
+    }
+}
+
+/* Extra large screens */
+@media (min-width: 1400px) {
+    .container {
+        max-width: var(--container-max-width-xl);
+    }
+
+    .left-panel {
+        flex: 0 0 var(--left-panel-width-xl);
+        max-width: var(--left-panel-width-xl);
+    }
+
+    .right-panel .image-box {
+        max-height: calc(100vh - 180px);
+    }
+}

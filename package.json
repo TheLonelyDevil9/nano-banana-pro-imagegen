@@ -1,0 +1,14 @@
+{
+    "name": "nano-banana-pro",
+    "version": "2.0.0",
+    "description": "Gemini image generation client with dual auth support",
+    "main": "index.html",
+    "author": "",
+    "license": "MIT",
+    "keywords": [
+        "gemini",
+        "ai",
+        "image-generation",
+        "vertex-ai"
+    ]
+}
