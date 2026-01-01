@@ -29,29 +29,43 @@ export function initDB() {
 
 // Save image to history with thumbnail
 export function saveToHistory(imageData, promptText, model) {
+    if (!db) {
+        console.error('saveToHistory: Database not initialized');
+        return;
+    }
+    
     const img = new Image();
     img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxSize = 150;
-        const ratio = Math.min(maxSize / img.width, maxSize / img.height);
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const thumbnail = canvas.toDataURL('image/png');
+        try {
+            const canvas = document.createElement('canvas');
+            const maxSize = 150;
+            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+            canvas.width = img.width * ratio;
+            canvas.height = img.height * ratio;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const thumbnail = canvas.toDataURL('image/png');
 
-        const tx = db.transaction('history', 'readwrite');
-        tx.objectStore('history').add({
-            id: 'img-' + Date.now(),
-            imageData: imageData,
-            thumbnail: thumbnail,
-            prompt: promptText,
-            model: model,
-            timestamp: Date.now(),
-            isFavorite: false
-        });
-        tx.oncomplete = () => loadHistory();
+            const tx = db.transaction('history', 'readwrite');
+            tx.onerror = (e) => console.error('saveToHistory transaction error:', e);
+            tx.objectStore('history').add({
+                id: 'img-' + Date.now(),
+                imageData: imageData,
+                thumbnail: thumbnail,
+                prompt: promptText,
+                model: model,
+                timestamp: Date.now(),
+                isFavorite: false
+            });
+            tx.oncomplete = () => {
+                console.log('Image saved to history');
+                loadHistory();
+            };
+        } catch (e) {
+            console.error('saveToHistory error:', e);
+        }
     };
+    img.onerror = (e) => console.error('saveToHistory image load error:', e);
     img.src = imageData;
 }
 
