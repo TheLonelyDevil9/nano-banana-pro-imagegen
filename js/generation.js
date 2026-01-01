@@ -345,6 +345,50 @@ export function clearOutput() {
     showToast('Output cleared');
 }
 
+// Clear all: refs, prompt, and output
+export function clearAll() {
+    // Clear reference images (without undo toast)
+    if (typeof window.clearRefsQuiet === 'function') {
+        window.clearRefsQuiet();
+    } else {
+        // Fallback: directly clear refs
+        import('./references.js').then(m => {
+            m.setRefImages([]);
+            m.renderRefs();
+        });
+    }
+
+    // Clear prompt
+    $('prompt').value = '';
+    import('./ui.js').then(m => m.updateCharCounter());
+
+    // Clear output if any
+    if (currentImg) {
+        currentImg = null;
+        setCurrentImgRef(null);
+        $('resultImg').src = '';
+        $('resultImg').classList.add('hidden');
+        $('placeholder').classList.remove('hidden');
+        updatePlaceholder('Ready to create!');
+        $('imageBox').classList.remove('has-image', 'is-zoomed');
+        $('error').classList.add('hidden');
+        $('groundingInfo').classList.add('hidden');
+        $('iterateBtn').disabled = $('downloadBtn').disabled = $('copyBtn').disabled = true;
+        $('regenerateBtn').disabled = true;
+        $('clearOutputBtn').disabled = true;
+        resetZoom();
+    }
+
+    // Clear conversation history
+    conversationHistory = [];
+    updateConversationIndicator();
+
+    // Persist cleared state
+    import('./persistence.js').then(m => m.persistAllInputs());
+
+    showToast('All cleared');
+}
+
 // Make functions globally available for HTML onclick handlers
 window.generate = generate;
 window.cancelGeneration = cancelGeneration;
@@ -354,3 +398,5 @@ window.download = download;
 window.copyImg = copyImg;
 window.clearOutput = clearOutput;
 window.clearConversation = clearConversation;
+window.clearAll = clearAll;
+

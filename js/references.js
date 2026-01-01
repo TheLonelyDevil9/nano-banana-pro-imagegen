@@ -223,9 +223,17 @@ export function setupClipboardPaste() {
     });
 }
 
+// Clear refs quietly (for clearAll - no undo toast)
+export function clearRefsQuiet() {
+    refImages = [];
+    renderRefs();
+    saveRefImages();
+}
+
 // Make functions globally available for HTML onclick handlers
 window.addRefImages = addRefImages;
 window.removeRef = removeRef;
 window.viewRefImage = viewRefImage;
 window.clearRefs = clearRefs;
 window.undoClearRefs = undoClearRefs;
+window.clearRefsQuiet = clearRefsQuiet;

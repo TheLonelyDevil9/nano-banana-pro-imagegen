@@ -294,7 +294,10 @@
         </div>
         
         <!-- Generate Button -->
-        <button class="btn-primary" id="generateBtn" onclick="generate()">Generate Image</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-primary" id="generateBtn" onclick="generate()" style="flex:1;">Generate Image</button>
+          <button class="btn-secondary" id="clearAllBtn" onclick="clearAll()" title="Clear refs, prompt & output">Clear</button>
+        </div>
         <button class="btn-cancel hidden" id="cancelBtn" onclick="cancelGeneration()">Cancel Generation</button>
       </div>
       <!-- End Left Panel -->
