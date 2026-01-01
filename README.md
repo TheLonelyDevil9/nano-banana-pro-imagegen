@@ -1,4 +1,4 @@
-# 🍌 Nano Banana Pro
+# Nano Banana Pro
 
 A powerful, feature-rich Gemini image generation client that runs entirely in your browser.
 
@@ -6,15 +6,15 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
   <img src="assets/banner.jpg" alt="Nano Banana Pro" width="1200">
 </p>
 
-## ✨ Features
+## Features
 
-### 🔐 Authentication
+### Authentication
 
 - **API Key** - Use your Gemini API key directly
 - **Vertex AI** - Enterprise auth with Service Account JSON (JWT signing in-browser)
 - Auto-refresh tokens & retry on auth errors
 
-### 🖼️ Image Generation
+### Image Generation
 
 - All Gemini image models (gemini-2.0-flash, gemini-3-pro, imagen-3, etc.)
 - **1K / 2K / 4K** resolution options
@@ -23,7 +23,7 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
 - Google Search grounding for real-world accuracy
 - Auto-retry with exponential backoff
 
-### 📷 Reference Images
+### Reference Images
 
 - Up to **14 reference images** per generation
 - Auto-compression to 2560px max (saves bandwidth)
@@ -31,29 +31,29 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
 - **Iterate** button adds output to references for refinement
 - Undo clear with 5-second restore window
 
-### 💾 History & Favorites
+### History & Favorites
 
 - Persistent storage via IndexedDB
 - Thumbnail generation for fast browsing
-- ⭐ Favorites system with filtering
+- Favorites system with filtering
 - Load prompts from history
 - Clear all (preserves favorites)
 
-### 🔍 Image Viewing
+### Image Viewing
 
 - Pinch-to-zoom (mobile) / Mouse wheel (desktop)
 - Pan when zoomed
 - Fullscreen modal with zoom controls
 - Download & copy to clipboard
 
-### 📱 Mobile Optimized
+### Mobile Optimized
 
 - Swipe up on image to iterate
 - Swipe down in fullscreen to close
 - Haptic feedback
 - Touch-friendly UI
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Local Server (Recommended)
 
@@ -74,9 +74,9 @@ Then open <http://localhost:3000>
 
 Fork this repo and enable GitHub Pages in Settings → Pages → Deploy from `main` branch.
 
-> ⚠️ **Note**: ES modules require a local server. Opening `index.html` directly via `file://` won't work.
+> **Note**: ES modules require a local server. Opening `index.html` directly via `file://` won't work.
 
-## 🔧 Getting Your API Key
+## Getting Your API Key
 
 ### Gemini API Key
 
@@ -92,7 +92,7 @@ Fork this repo and enable GitHub Pages in Settings → Pages → Deploy from `ma
 3. Download the JSON key file
 4. Drop the file in the app
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 nano-banana-pro/
@@ -119,7 +119,7 @@ nano-banana-pro/
 └── assets/             # (empty, for future use)
 ```
 
-## 🗄️ Data Storage
+## Data Storage
 
 All data stays in your browser:
 
@@ -133,7 +133,7 @@ All data stays in your browser:
 
 **Nothing is sent to any server except the Gemini/Vertex API for generation.**
 
-## 🌐 Browser Support
+## Browser Support
 
 | Browser | Minimum Version |
 |---------|-----------------|
@@ -142,7 +142,7 @@ All data stays in your browser:
 | Edge | 90+ |
 | Safari | 15+ |
 
-## 🛠️ Development
+## Development
 
 No build tools required! Edit files directly and refresh.
 
@@ -151,12 +151,6 @@ No build tools required! Edit files directly and refresh.
 npx serve --reload
 ```
 
-## 📄 License
+## License
 
-MIT License - do whatever you want with it! 🎉
-
----
-
-<p align="center">
-  Made with 🍌 and ☕
-</p>
+MIT License - do whatever you want with it!
