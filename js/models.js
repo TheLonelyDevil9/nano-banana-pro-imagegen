@@ -8,10 +8,30 @@ import { authMode, serviceAccount, getVertexAccessToken } from './auth.js';
 import { $, showToast } from './ui.js';
 import { restoreLastModel } from './persistence.js';
 
+// Model cache with TTL
+const MODEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let modelCache = { data: null, timestamp: 0, authMode: null, key: null };
+
 // Refresh models list
-export async function refreshModels() {
+export async function refreshModels(forceRefresh = false) {
     const refreshBtn = $('refreshBtn');
     const modelStatus = $('modelStatus');
+
+    // Check cache for API key mode
+    if (!forceRefresh && authMode === 'apikey') {
+        const apiKey = $('apiKey').value;
+        if (modelCache.data &&
+            modelCache.authMode === 'apikey' &&
+            modelCache.key === apiKey &&
+            Date.now() - modelCache.timestamp < MODEL_CACHE_TTL) {
+            // Use cached data
+            renderModels(modelCache.data);
+            modelStatus.textContent = modelCache.data.length + ' models (cached)';
+            modelStatus.className = 'model-status success';
+            restoreLastModel();
+            return;
+        }
+    }
 
     refreshBtn.classList.add('loading');
     modelStatus.textContent = 'Loading...';
@@ -32,11 +52,16 @@ export async function refreshModels() {
     }
 }
 
+// Render models to select element
+function renderModels(models) {
+    const modelSelect = $('modelSelect');
+    modelSelect.innerHTML = models.map(id => '<option value="' + id + '">' + id + '</option>').join('');
+}
+
 // Refresh models for API Key auth
 async function refreshModelsAPIKey() {
     const apiKey = $('apiKey').value;
     const modelStatus = $('modelStatus');
-    const modelSelect = $('modelSelect');
 
     if (!apiKey) {
         modelStatus.textContent = 'Enter API key';
@@ -48,12 +73,17 @@ async function refreshModelsAPIKey() {
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
 
-    const models = data.models || [];
-    modelSelect.innerHTML = models.map(m => {
-        const id = m.name.replace('models/', '');
-        return '<option value="' + id + '">' + id + '</option>';
-    }).join('');
+    const models = (data.models || []).map(m => m.name.replace('models/', ''));
 
+    // Cache the results
+    modelCache = {
+        data: models,
+        timestamp: Date.now(),
+        authMode: 'apikey',
+        key: apiKey
+    };
+
+    renderModels(models);
     modelStatus.textContent = models.length + ' models';
     modelStatus.className = 'model-status success';
 }
@@ -61,7 +91,6 @@ async function refreshModelsAPIKey() {
 // Refresh models for Vertex AI auth
 async function refreshModelsVertex() {
     const modelStatus = $('modelStatus');
-    const modelSelect = $('modelSelect');
 
     if (!serviceAccount) {
         modelStatus.textContent = 'Load service account JSON';
@@ -77,7 +106,7 @@ async function refreshModelsVertex() {
 
     try {
         await getVertexAccessToken();
-        modelSelect.innerHTML = VERTEX_MODELS.map(id => '<option value="' + id + '">' + id + '</option>').join('');
+        renderModels(VERTEX_MODELS);
         modelStatus.textContent = 'Authenticated ✓';
         modelStatus.className = 'model-status success';
     } catch (e) {

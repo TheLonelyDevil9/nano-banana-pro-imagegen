@@ -5,7 +5,8 @@
 
 import { MAX_REF_IMAGE_SIZE, MAX_REFS } from './config.js';
 import { $, showToast } from './ui.js';
-import { persistInput, loadPersistedInput } from './persistence.js';
+import { getDB } from './history.js';
+import { loadPersistedInput } from './persistence.js';
 
 // Reference images state
 export let refImages = [];
@@ -15,18 +16,59 @@ export function setRefImages(images) {
     refImages = images;
 }
 
-// Load ref images from storage
-export function loadRefImages() {
-    refImages = loadPersistedInput('refImages', []);
-    renderRefs();
+// Load ref images from IndexedDB (with localStorage migration)
+export async function loadRefImages() {
+    const db = getDB();
+    if (!db) {
+        // Fallback to localStorage if DB not ready
+        refImages = loadPersistedInput('refImages', []);
+        renderRefs();
+        return;
+    }
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('refImages', 'readonly');
+        tx.objectStore('refImages').get('current').onsuccess = e => {
+            const result = e.target.result;
+            if (result && result.images) {
+                refImages = result.images;
+                renderRefs();
+                resolve();
+            } else {
+                // Migrate from localStorage if exists
+                const oldData = loadPersistedInput('refImages', []);
+                if (oldData.length > 0) {
+                    refImages = oldData;
+                    renderRefs();
+                    saveRefImages().then(() => {
+                        // Clear old localStorage data after migration
+                        localStorage.removeItem('input_refImages');
+                        console.log('Migrated refImages from localStorage to IndexedDB');
+                    });
+                } else {
+                    refImages = [];
+                    renderRefs();
+                }
+                resolve();
+            }
+        };
+    });
 }
 
-// Save ref images to storage
-export function saveRefImages() {
-    persistInput('refImages', refImages);
+// Save ref images to IndexedDB
+export async function saveRefImages() {
+    const db = getDB();
+    if (!db) return;
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('refImages', 'readwrite');
+        tx.objectStore('refImages').put({ id: 'current', images: refImages });
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
 }
 
-// Compress image to max size
+// Compress image to max size (using JPEG for smaller file size)
 export function compressImage(dataUrl) {
     return new Promise(resolve => {
         const img = new Image();
@@ -42,7 +84,8 @@ export function compressImage(dataUrl) {
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/png'));
+            // Use JPEG with 0.85 quality for smaller file size
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
         };
         img.src = dataUrl;
     });

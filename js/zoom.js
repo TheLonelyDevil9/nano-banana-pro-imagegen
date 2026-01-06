@@ -3,7 +3,7 @@
  * Pinch-to-zoom for image box and fullscreen modal
  */
 
-import { FS_MAX_ZOOM, FS_MIN_ZOOM } from './config.js';
+import { FS_MAX_ZOOM, FS_MIN_ZOOM, IMAGE_BOX_MAX_ZOOM, IMAGE_BOX_MIN_ZOOM, DOUBLE_TAP_THRESHOLD, DOUBLE_TAP_ZOOM, SWIPE_THRESHOLD_Y, SWIPE_THRESHOLD_X, SWIPE_DISMISS_THRESHOLD } from './config.js';
 import { $, haptic } from './ui.js';
 
 // Image box zoom state
@@ -144,12 +144,12 @@ export function setupZoomHandlers() {
     imageBox.addEventListener('touchstart', e => {
         if (resultImg.classList.contains('hidden')) return;
         const now = Date.now();
-        if (e.touches.length === 1 && now - lastTap < 300) {
+        if (e.touches.length === 1 && now - lastTap < DOUBLE_TAP_THRESHOLD) {
             e.preventDefault();
             if (scale > 1.05) {
                 resetZoom();
             } else {
-                scale = lastScale = 2.5;
+                scale = lastScale = DOUBLE_TAP_ZOOM;
                 updateZoom();
             }
             lastTap = 0;
@@ -173,7 +173,7 @@ export function setupZoomHandlers() {
         if (resultImg.classList.contains('hidden')) return;
         if (pinching && e.touches.length === 2) {
             e.preventDefault();
-            scale = Math.max(1, Math.min(5, lastScale * getDist(e.touches) / startDist));
+            scale = Math.max(IMAGE_BOX_MIN_ZOOM, Math.min(IMAGE_BOX_MAX_ZOOM, lastScale * getDist(e.touches) / startDist));
             const m = getMid(e.touches);
             posX = lastX + m.x - startX; posY = lastY + m.y - startY;
             clampPos(); updateZoom();
@@ -198,7 +198,7 @@ export function setupZoomHandlers() {
         const cursorX = e.clientX - rect.left - rect.width / 2;
         const cursorY = e.clientY - rect.top - rect.height / 2;
         const oldScale = scale;
-        scale = Math.max(1, Math.min(5, scale * (e.deltaY > 0 ? 0.9 : 1.1)));
+        scale = Math.max(IMAGE_BOX_MIN_ZOOM, Math.min(IMAGE_BOX_MAX_ZOOM, scale * (e.deltaY > 0 ? 0.9 : 1.1)));
         if (scale !== oldScale) {
             const scaleFactor = scale / oldScale;
             posX = cursorX - (cursorX - posX) * scaleFactor;
@@ -291,7 +291,7 @@ export function setupZoomHandlers() {
     // Touch handlers for fullscreen
     fsContainer.addEventListener('touchstart', e => {
         const now = Date.now();
-        if (e.touches.length === 1 && now - fsLastTap < 300) {
+        if (e.touches.length === 1 && now - fsLastTap < DOUBLE_TAP_THRESHOLD) {
             e.preventDefault();
             if (fsScale > 1.05) {
                 fsResetZoom();
@@ -374,7 +374,7 @@ export function setupZoomHandlers() {
         if (swipeStartY && e.changedTouches.length === 1 && scale <= 1.1) {
             const deltaY = swipeStartY - e.changedTouches[0].clientY;
             const deltaX = Math.abs(swipeStartX - e.changedTouches[0].clientX);
-            if (deltaY > 80 && deltaX < 50 && currentImg) {
+            if (deltaY > SWIPE_THRESHOLD_Y && deltaX < SWIPE_THRESHOLD_X && currentImg) {
                 // Call iterate through window global
                 if (window.iterate) window.iterate();
                 haptic(30);
@@ -395,7 +395,7 @@ export function setupZoomHandlers() {
     fsContainer.addEventListener('touchend', e => {
         if (fsSwipeStartY && e.changedTouches.length === 1 && fsScale <= 1.1) {
             const deltaY = e.changedTouches[0].clientY - fsSwipeStartY;
-            if (deltaY > 100) {
+            if (deltaY > SWIPE_DISMISS_THRESHOLD) {
                 closeFullscreen();
                 haptic(20);
             }

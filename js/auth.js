@@ -12,6 +12,34 @@ export let authMode = 'apikey';
 export let serviceAccount = null;
 export let vertexAccessToken = null;
 export let tokenExpiry = 0;
+let jsrsasignLoaded = false;
+let jsrsasignLoading = false;
+
+// Lazy-load jsrsasign library (only needed for Vertex AI)
+async function loadJsrsasign() {
+    if (jsrsasignLoaded) return;
+    if (jsrsasignLoading) {
+        // Wait for existing load to complete
+        while (jsrsasignLoading) {
+            await new Promise(r => setTimeout(r, 100));
+        }
+        return;
+    }
+
+    jsrsasignLoading = true;
+    try {
+        await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('Failed to load jsrsasign library'));
+            document.head.appendChild(script);
+        });
+        jsrsasignLoaded = true;
+    } finally {
+        jsrsasignLoading = false;
+    }
+}
 
 // Set auth mode
 export function setAuthMode(mode) {
@@ -112,6 +140,9 @@ export async function getVertexAccessToken() {
     if (!serviceAccount) {
         throw new Error('No service account loaded');
     }
+
+    // Lazy-load jsrsasign library
+    await loadJsrsasign();
 
     const now = Math.floor(Date.now() / 1000);
     const expiry = now + 3600;

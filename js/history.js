@@ -17,14 +17,32 @@ let currentPreviewItem = null;
 // Initialize IndexedDB
 export function initDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open('NanoBananaDB', 1);
+        const req = indexedDB.open('NanoBananaDB', 2);
         req.onerror = () => reject(req.error);
         req.onsuccess = () => { db = req.result; resolve(); };
         req.onupgradeneeded = e => {
-            const store = e.target.result.createObjectStore('history', { keyPath: 'id' });
-            store.createIndex('timestamp', 'timestamp');
+            const database = e.target.result;
+            // History store (v1)
+            if (!database.objectStoreNames.contains('history')) {
+                const historyStore = database.createObjectStore('history', { keyPath: 'id' });
+                historyStore.createIndex('timestamp', 'timestamp');
+            }
+            // Saved prompts store (v2)
+            if (!database.objectStoreNames.contains('savedPrompts')) {
+                const promptsStore = database.createObjectStore('savedPrompts', { keyPath: 'id' });
+                promptsStore.createIndex('createdAt', 'createdAt');
+            }
+            // Reference images store (v2)
+            if (!database.objectStoreNames.contains('refImages')) {
+                database.createObjectStore('refImages', { keyPath: 'id' });
+            }
         };
     });
+}
+
+// Export db for other modules
+export function getDB() {
+    return db;
 }
 
 // Save image to history with thumbnail
@@ -101,23 +119,32 @@ export function loadHistory(append = false) {
 // Render history items
 function renderHistoryItems(append = false) {
     const historyList = $('historyList');
-    const itemsToShow = allHistoryItems.slice(0, (historyOffset + 1) * HISTORY_PAGE_SIZE);
+    const startIdx = append ? historyOffset * HISTORY_PAGE_SIZE : 0;
+    const endIdx = (historyOffset + 1) * HISTORY_PAGE_SIZE;
+    const itemsToShow = allHistoryItems.slice(startIdx, endIdx);
 
-    if (itemsToShow.length === 0) {
+    if (allHistoryItems.length === 0) {
         historyList.innerHTML = '<div class="history-empty">' +
             (historyFilter === 'favorites' ? 'No favorites yet' : 'No images yet') + '</div>';
         return;
     }
 
-    historyList.innerHTML = itemsToShow.map(i =>
-        '<div class="history-item" onclick="loadHistoryItem(\'' + i.id + '\')">' +
-        '<button class="delete-btn" onclick="deleteHistoryItem(\'' + i.id + '\', event)">🗑</button>' +
-        '<button class="favorite-btn ' + (i.isFavorite ? 'active' : '') + '" onclick="toggleFavorite(\'' + i.id + '\', event)">' +
-        (i.isFavorite ? '★' : '☆') + '</button>' +
-        '<img src="' + (i.thumbnail || i.imageData) + '" loading="lazy">' +
-        '<div class="history-item-info">' + i.prompt.slice(0, 20) + '</div>' +
-        '</div>'
-    ).join('');
+    // Create elements using DocumentFragment for better performance
+    if (append) {
+        const fragment = document.createDocumentFragment();
+        itemsToShow.forEach(i => {
+            fragment.appendChild(createHistoryItemElement(i));
+        });
+        historyList.appendChild(fragment);
+    } else {
+        // Full re-render
+        historyList.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        allHistoryItems.slice(0, endIdx).forEach(i => {
+            fragment.appendChild(createHistoryItemElement(i));
+        });
+        historyList.appendChild(fragment);
+    }
 
     // Setup infinite scroll
     if (!historyList.dataset.scrollSetup) {
@@ -131,6 +158,38 @@ function renderHistoryItems(append = false) {
             }
         });
     }
+}
+
+// Create a single history item element
+function createHistoryItemElement(item) {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.onclick = () => loadHistoryItem(item.id);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.textContent = '🗑';
+    deleteBtn.onclick = (e) => deleteHistoryItem(item.id, e);
+
+    const favBtn = document.createElement('button');
+    favBtn.className = 'favorite-btn' + (item.isFavorite ? ' active' : '');
+    favBtn.textContent = item.isFavorite ? '★' : '☆';
+    favBtn.onclick = (e) => toggleFavorite(item.id, e);
+
+    const img = document.createElement('img');
+    img.src = item.thumbnail || item.imageData;
+    img.loading = 'lazy';
+
+    const info = document.createElement('div');
+    info.className = 'history-item-info';
+    info.textContent = item.prompt.slice(0, 20);
+
+    div.appendChild(deleteBtn);
+    div.appendChild(favBtn);
+    div.appendChild(img);
+    div.appendChild(info);
+
+    return div;
 }
 
 // Toggle history panel

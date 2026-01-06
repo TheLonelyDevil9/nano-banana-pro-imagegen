@@ -11,6 +11,7 @@ import { renderRefs, loadRefImages, setupRefDragDrop, setupClipboardPaste } from
 import { initDB, loadHistory, useHistoryItem } from './history.js';
 import { setupZoomHandlers, resetZoom, setCurrentImgRef } from './zoom.js';
 import { generate, loadSessionStats, setCurrentImg } from './generation.js';
+import { loadSavedPrompts, isDropdownOpen, closePromptsDropdown } from './prompts.js';
 
 // Initialize application
 async function init() {
@@ -97,6 +98,14 @@ async function init() {
     // Initialize database and load history
     await initDB();
     loadHistory();
+    loadSavedPrompts();
+
+    // Click outside to close prompts dropdown
+    document.addEventListener('click', e => {
+        if (isDropdownOpen() && !e.target.closest('.dropdown-container') && !e.target.closest('.dropdown')) {
+            closePromptsDropdown();
+        }
+    });
 
     // Load models if API key exists
     if ($('apiKey').value.length > 20) {
