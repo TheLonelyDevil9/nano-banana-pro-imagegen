@@ -153,13 +153,90 @@ export function removeRef(id) {
     saveRefImages();
 }
 
-// View reference image in fullscreen
+// View reference image in fullscreen with navigation
+let currentRefIndex = 0;
+
 export function viewRefImage(id) {
-    const ref = refImages.find(r => r.id === id);
-    if (ref) {
-        $('fullscreenImg').src = ref.data;
-        $('fullscreenModal').classList.add('open');
+    const idx = refImages.findIndex(r => r.id === id);
+    if (idx === -1) return;
+
+    currentRefIndex = idx;
+    showRefPreview();
+}
+
+function showRefPreview() {
+    if (refImages.length === 0) return;
+
+    const ref = refImages[currentRefIndex];
+    $('refPreviewImg').src = ref.data;
+    $('refPreviewCounter').textContent = (currentRefIndex + 1) + ' / ' + refImages.length;
+    $('refPreviewModal').classList.add('open');
+
+    // Update arrow visibility
+    $('refPrevBtn').style.visibility = currentRefIndex > 0 ? 'visible' : 'hidden';
+    $('refNextBtn').style.visibility = currentRefIndex < refImages.length - 1 ? 'visible' : 'hidden';
+}
+
+export function prevRefImage() {
+    if (currentRefIndex > 0) {
+        currentRefIndex--;
+        showRefPreview();
     }
+}
+
+export function nextRefImage() {
+    if (currentRefIndex < refImages.length - 1) {
+        currentRefIndex++;
+        showRefPreview();
+    }
+}
+
+export function closeRefPreview() {
+    $('refPreviewModal').classList.remove('open');
+}
+
+// Setup swipe gestures for reference preview
+export function setupRefPreviewSwipe() {
+    const modal = $('refPreviewModal');
+    if (!modal) return;
+
+    let startX = 0;
+    let startY = 0;
+
+    modal.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }
+    }, { passive: true });
+
+    modal.addEventListener('touchend', e => {
+        if (!startX || e.changedTouches.length !== 1) return;
+
+        const deltaX = e.changedTouches[0].clientX - startX;
+        const deltaY = Math.abs(e.changedTouches[0].clientY - startY);
+
+        // Horizontal swipe (more horizontal than vertical)
+        if (Math.abs(deltaX) > 50 && deltaY < 100) {
+            if (deltaX > 0) {
+                prevRefImage(); //pe right = previous
+            } else {
+                nextRefImage(); // Swipe left = next
+            }
+        }
+
+        startX = 0;
+        startY = 0;
+    }, { passive: true });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', e => {
+        if (!$('refPreviewModal').classList.contains('open')) return;
+
+        if (e.key === 'ArrowLeft') prevRefImage();
+        else if (e.key === 'ArrowRight') nextRefImage();
+        else if (e.key === 'Escape') closeRefPreview();
+    });
 }
 
 // Clear all reference images with undo
@@ -280,3 +357,6 @@ window.viewRefImage = viewRefImage;
 window.clearRefs = clearRefs;
 window.undoClearRefs = undoClearRefs;
 window.clearRefsQuiet = clearRefsQuiet;
+window.prevRefImage = prevRefImage;
+window.nextRefImage = nextRefImage;
+window.closeRefPreview = closeRefPreview;

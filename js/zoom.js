@@ -1,14 +1,10 @@
 /**
  * Zoom Module
- * Pinch-to-zoom for image box and fullscreen modal
+ * Pinch-to-zoom for fullscreen modal only
  */
 
-import { FS_MAX_ZOOM, FS_MIN_ZOOM, IMAGE_BOX_MAX_ZOOM, IMAGE_BOX_MIN_ZOOM, DOUBLE_TAP_THRESHOLD, DOUBLE_TAP_ZOOM } from './config.js';
-import { $, haptic } from './ui.js';
-
-// Image box zoom state
-let scale = 1, posX = 0, posY = 0, lastScale = 1, lastX = 0, lastY = 0;
-let startDist = 0, startX = 0, startY = 0, pinching = false, dragging = false, lastTap = 0;
+import { FS_MAX_ZOOM, FS_MIN_ZOOM, DOUBLE_TAP_THRESHOLD } from './config.js';
+import { $ } from './ui.js';
 
 // Fullscreen zoom state
 let fsScale = 1, fsPosX = 0, fsPosY = 0, fsLastScale = 1, fsLastX = 0, fsLastY = 0;
@@ -27,41 +23,12 @@ export function getCurrentImg() {
     return currentImg;
 }
 
-// Helper functions
-function getDist(t) {
-    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-}
-
-function getMid(t) {
-    return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
-}
-
-// Image box zoom
-function updateZoom() {
-    const resultImg = $('resultImg');
-    const imageBox = $('imageBox');
-    resultImg.style.transform = 'translate(' + posX + 'px,' + posY + 'px) scale(' + scale + ')';
-    imageBox.classList.toggle('is-zoomed', scale > 1.05);
-}
-
+// Reset image box to default (no zoom on main image box)
 export function resetZoom() {
-    scale = 1; posX = 0; posY = 0; lastScale = 1; lastX = 0; lastY = 0;
-    updateZoom();
-}
-
-function clampPos() {
-    const imageBox = $('imageBox');
     const resultImg = $('resultImg');
-
-    if (scale <= 1) { posX = posY = 0; return; }
-    const boxRect = imageBox.getBoundingClientRect();
-    const imgRect = resultImg.getBoundingClientRect();
-    const scaledImgW = (imgRect.width / scale) * scale;
-    const scaledImgH = (imgRect.height / scale) * scale;
-    const maxX = Math.max(0, (scaledImgW - boxRect.width) / 2);
-    const maxY = Math.max(0, (scaledImgH - boxRect.height) / 2);
-    posX = Math.max(-maxX, Math.min(maxX, posX));
-    posY = Math.max(-maxY, Math.min(maxY, posY));
+    if (resultImg) {
+        resultImg.style.transform = '';
+    }
 }
 
 // Fullscreen zoom
@@ -140,76 +107,9 @@ export function setupZoomHandlers() {
     const resultImg = $('resultImg');
     const fsContainer = $('fullscreenContainer');
 
-    // Image box touch handlers
-    imageBox.addEventListener('touchstart', e => {
-        if (resultImg.classList.contains('hidden')) return;
-        const now = Date.now();
-        if (e.touches.length === 1 && now - lastTap < DOUBLE_TAP_THRESHOLD) {
-            e.preventDefault();
-            if (scale > 1.05) {
-                resetZoom();
-            } else {
-                scale = lastScale = DOUBLE_TAP_ZOOM;
-                updateZoom();
-            }
-            lastTap = 0;
-            return;
-        }
-        lastTap = now;
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            pinching = true; dragging = false;
-            startDist = getDist(e.touches); lastScale = scale;
-            const m = getMid(e.touches);
-            startX = m.x; startY = m.y; lastX = posX; lastY = posY;
-        } else if (e.touches.length === 1 && scale > 1) {
-            dragging = true; pinching = false;
-            startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-            lastX = posX; lastY = posY;
-        }
-    }, { passive: false });
-
-    imageBox.addEventListener('touchmove', e => {
-        if (resultImg.classList.contains('hidden')) return;
-        if (pinching && e.touches.length === 2) {
-            e.preventDefault();
-            scale = Math.max(IMAGE_BOX_MIN_ZOOM, Math.min(IMAGE_BOX_MAX_ZOOM, lastScale * getDist(e.touches) / startDist));
-            const m = getMid(e.touches);
-            posX = lastX + m.x - startX; posY = lastY + m.y - startY;
-            clampPos(); updateZoom();
-        } else if (dragging && e.touches.length === 1 && scale > 1) {
-            e.preventDefault();
-            posX = lastX + e.touches[0].clientX - startX;
-            posY = lastY + e.touches[0].clientY - startY;
-            clampPos(); updateZoom();
-        }
-    }, { passive: false });
-
-    imageBox.addEventListener('touchend', e => {
-        if (e.touches.length < 2) { pinching = false; lastScale = scale; lastX = posX; lastY = posY; }
-        if (e.touches.length === 0) { dragging = false; if (scale < 1.1) resetZoom(); }
-    });
-
-    // Image box wheel zoom
-    imageBox.addEventListener('wheel', e => {
-        if (resultImg.classList.contains('hidden')) return;
-        e.preventDefault();
-        const rect = imageBox.getBoundingClientRect();
-        const cursorX = e.clientX - rect.left - rect.width / 2;
-        const cursorY = e.clientY - rect.top - rect.height / 2;
-        const oldScale = scale;
-        scale = Math.max(IMAGE_BOX_MIN_ZOOM, Math.min(IMAGE_BOX_MAX_ZOOM, scale * (e.deltaY > 0 ? 0.9 : 1.1)));
-        if (scale !== oldScale) {
-            const scaleFactor = scale / oldScale;
-            posX = cursorX - (cursorX - posX) * scaleFactor;
-            posY = cursorY - (cursorY - posY) * scaleFactor;
-        }
-        clampPos(); updateZoom();
-    }, { passive: false });
-
-    // Image box click for fullscreen
+    // Image box click for fullscreen (zoom only available in fullscreen modal)
     imageBox.addEventListener('click', e => {
-        if (!resultImg.classList.contains('hidden') && scale <= 1.05 && currentImg) {
+        if (!resultImg.classList.contains('hidden') && currentImg) {
             openFullscreen();
         }
     });

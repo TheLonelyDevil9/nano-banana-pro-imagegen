@@ -7,7 +7,7 @@ import { $, debounce, restoreCollapsibleStates, updateCharCounter, updateAspectP
 import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastModel } from './persistence.js';
 import { authMode, restoreServiceAccount, restoreAuthMode, setupAuthDragDrop } from './auth.js';
 import { refreshModels } from './models.js';
-import { renderRefs, loadRefImages, setupRefDragDrop, setupClipboardPaste } from './references.js';
+import { renderRefs, loadRefImages, setupRefDragDrop, setupClipboardPaste, setupRefPreviewSwipe } from './references.js';
 import { initDB, loadHistory, useHistoryItem } from './history.js';
 import { setupZoomHandlers, resetZoom, setCurrentImgRef } from './zoom.js';
 import { generate, loadSessionStats, setCurrentImg } from './generation.js';
@@ -86,6 +86,7 @@ async function init() {
     setupAuthDragDrop();
     setupRefDragDrop();
     setupClipboardPaste();
+    setupRefPreviewSwipe();
 
     // Setup zoom handlers
     setupZoomHandlers();
