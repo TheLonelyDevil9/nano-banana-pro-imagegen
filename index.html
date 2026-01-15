@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Nano Banana Pro</title>
 
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%8D%8C</text></svg>">
+
   <!-- CSS Modules -->
   <link rel="stylesheet" href="css/main.css">
 </head>
@@ -96,8 +99,8 @@
             <details style="margin-bottom:8px;">
               <summary style="cursor:pointer;color:#aaa;">📱 Mobile Features</summary>
               <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>Swipe up on image to iterate</li>
-                <li>Swipe down in fullscreen to close</li>
+                <li>Pinch-to-zoom on images</li>
+                <li>Double-tap to zoom/reset</li>
                 <li>Haptic feedback (vibration)</li>
                 <li>Touch-optimized UI</li>
               </ul>
@@ -142,6 +145,7 @@
             <div class="auth-tabs">
               <div class="auth-tab active" data-mode="apikey" onclick="switchAuthMode('apikey')">API Key</div>
               <div class="auth-tab" data-mode="vertex" onclick="switchAuthMode('vertex')">Vertex AI</div>
+              <div class="auth-tab" data-mode="antigravity" onclick="switchAuthMode('antigravity')">Antigravity</div>
             </div>
             <div class="auth-content">
               <!-- API Key Panel -->
@@ -161,6 +165,16 @@
                 <!-- Hidden fields - auto-populated from service account -->
                 <input type="hidden" id="projectId">
                 <input type="hidden" id="vertexLocation" value="global">
+              </div>
+              <!-- Antigravity Panel -->
+              <div class="auth-panel" id="antigravityPanel">
+                <label style="font-size:0.7rem;color:#888;">Server URL</label>
+                <input type="text" id="antigravityUrl" placeholder="http://localhost:3000" value="http://localhost:3000">
+                <label style="font-size:0.7rem;color:#888;margin-top:8px;">API Key (optional)</label>
+                <div class="api-key-row">
+                  <input type="password" id="antigravityApiKey" placeholder="Enter API key (if required)">
+                  <button class="btn-toggle-visibility" onclick="toggleAntigravityKeyVisibility()" title="Show/Hide">👁️</button>
+                </div>
               </div>
             </div>
           </div>
@@ -195,6 +209,9 @@
           <div class="prompt-header">
             <label>Prompt</label>
             <div class="prompt-actions">
+              <button class="icon-btn" onclick="openPromptEditor()" title="Expand (Ctrl+Shift+F)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1"/></svg>
+              </button>
               <button class="icon-btn" onclick="saveCurrentPrompt()" title="Save prompt">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
               </button>
@@ -400,6 +417,24 @@
         <button class="btn-primary" onclick="useHistoryItem()">Use Prompt & Image</button>
         <button class="btn-secondary" onclick="downloadPreview()">Download</button>
         <button class="btn-secondary" onclick="closePreview()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Prompt Editor Modal -->
+  <div class="prompt-editor-modal" id="promptEditorModal">
+    <div class="prompt-editor-header">
+      <h3>Edit Prompt</h3>
+      <button class="prompt-editor-close" onclick="closePromptEditor()">×</button>
+    </div>
+    <div class="prompt-editor-body">
+      <textarea id="promptEditorTextarea" placeholder="Describe the image..."></textarea>
+    </div>
+    <div class="prompt-editor-footer">
+      <span class="prompt-editor-counter" id="promptEditorCounter">0</span>
+      <div class="prompt-editor-actions">
+        <button class="btn-secondary" onclick="closePromptEditor()">Cancel</button>
+        <button class="btn-primary" onclick="applyPromptEditor()">Done</button>
       </div>
     </div>
   </div>

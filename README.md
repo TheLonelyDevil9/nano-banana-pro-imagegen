@@ -12,6 +12,7 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
 
 - **API Key** - Use your Gemini API key directly
 - **Vertex AI** - Enterprise auth with Service Account JSON (JWT signing in-browser)
+- **Antigravity** - Connect to AIClient-2-API for additional models (OpenAI-compatible)
 - Auto-refresh tokens & retry on auth errors
 
 ### Image Generation
@@ -48,14 +49,29 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
 
 ### Mobile Optimized
 
-- Swipe up on image to iterate
-- Swipe down in fullscreen to close
+- Pinch-to-zoom on images
+- Double-tap to zoom/reset
 - Haptic feedback
 - Touch-friendly UI
+- Fullscreen prompt editor for comfortable typing
+
+### Prompt Editor
+
+- **Fullscreen mode** - Click expand button or press `Ctrl+Shift+F`
+- Character counter
+- Works on all platforms (desktop & mobile)
 
 ## Quick Start
 
-### Option 1: Local Server (Recommended)
+### Option 1: One-Click Launchers
+
+**Windows** - Double-click `start-hidden.vbs` to run the server in the background (no terminal window)
+
+**Termux/Android** - Run `bash start-termux.sh` to start the server in the background
+
+**Standard** - Double-click `start.bat` (Windows) or run `./start.sh` (Linux/Mac)
+
+### Option 2: Manual Start
 
 ```bash
 # Clone the repo
@@ -63,14 +79,14 @@ git clone https://github.com/yourusername/nano-banana-pro.git
 cd nano-banana-pro
 
 # Start local server
-npx serve
+npx serve -l 3000
 # or
 python -m http.server 3000
 ```
 
 Then open <http://localhost:3000>
 
-### Option 2: GitHub Pages
+### Option 3: GitHub Pages
 
 Fork this repo and enable GitHub Pages in Settings → Pages → Deploy from `main` branch.
 
@@ -92,32 +108,53 @@ Fork this repo and enable GitHub Pages in Settings → Pages → Deploy from `ma
 3. Download the JSON key file
 4. Drop the file in the app
 
+### Antigravity (AIClient-2-API)
+
+1. Run AIClient-2-API on your local machine or server
+2. Switch to the "Antigravity" tab in the app
+3. Enter the server URL (default: `http://localhost:3000`)
+4. Optionally enter an API key if required
+
 ## Project Structure
 
 ```
 nano-banana-pro/
 ├── index.html          # Entry point
+├── start.bat           # Windows launcher (with terminal)
+├── start.sh            # Linux/Mac launcher
+├── start-hidden.vbs    # Windows launcher (no terminal)
+├── start-termux.sh     # Termux/Android launcher
 ├── css/
 │   ├── variables.css   # Design tokens (colors, spacing)
 │   ├── base.css        # Reset, typography
 │   ├── components.css  # Buttons, inputs, toggles
 │   ├── layout.css      # Container, responsive grid
-│   ├── modals.css      # Fullscreen, history, preview
+│   ├── modals.css      # Fullscreen, history, preview, prompt editor
 │   └── utilities.css   # Animations, helpers
 ├── js/
 │   ├── app.js          # Entry point & initialization
 │   ├── config.js       # Constants
-│   ├── auth.js         # API key & Vertex AI auth
+│   ├── auth.js         # API key, Vertex AI & Antigravity auth
 │   ├── api.js          # API calls with retry logic
 │   ├── models.js       # Model loading
 │   ├── generation.js   # Image generation orchestration
 │   ├── references.js   # Reference image handling
 │   ├── history.js      # IndexedDB operations
 │   ├── zoom.js         # Pinch-to-zoom controls
-│   ├── ui.js           # Toast, haptics, DOM helpers
-│   └── persistence.js  # LocalStorage management
-└── assets/             # (empty, for future use)
+│   ├── ui.js           # Toast, haptics, DOM helpers, prompt editor
+│   ├── persistence.js  # LocalStorage management
+│   └── prompts.js      # Saved prompts management
+└── assets/             # Banner image
 ```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Enter` | Generate image |
+| `Ctrl+Shift+F` | Open fullscreen prompt editor |
+| `Escape` | Close fullscreen/modals |
+| `+` / `-` / `0` | Zoom in/out/reset (in fullscreen) |
 
 ## Data Storage
 
@@ -125,13 +162,13 @@ All data stays in your browser:
 
 | Type | Storage | Contents |
 |------|---------|----------|
-| Credentials | localStorage | API key, service account JSON |
+| Credentials | localStorage | API key, service account JSON, Antigravity settings |
 | Settings | localStorage | UI preferences, last model |
 | Reference Images | localStorage | Base64 compressed images |
 | Generated Images | IndexedDB | Full images + thumbnails |
 | Session Stats | sessionStorage | Generation count |
 
-**Nothing is sent to any server except the Gemini/Vertex API for generation.**
+**Nothing is sent to any server except the Gemini/Vertex/Antigravity API for generation.**
 
 ## Browser Support
 

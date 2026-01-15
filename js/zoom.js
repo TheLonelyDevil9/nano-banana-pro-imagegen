@@ -3,7 +3,7 @@
  * Pinch-to-zoom for image box and fullscreen modal
  */
 
-import { FS_MAX_ZOOM, FS_MIN_ZOOM, IMAGE_BOX_MAX_ZOOM, IMAGE_BOX_MIN_ZOOM, DOUBLE_TAP_THRESHOLD, DOUBLE_TAP_ZOOM, SWIPE_THRESHOLD_Y, SWIPE_THRESHOLD_X, SWIPE_DISMISS_THRESHOLD } from './config.js';
+import { FS_MAX_ZOOM, FS_MIN_ZOOM, IMAGE_BOX_MAX_ZOOM, IMAGE_BOX_MIN_ZOOM, DOUBLE_TAP_THRESHOLD, DOUBLE_TAP_ZOOM } from './config.js';
 import { $, haptic } from './ui.js';
 
 // Image box zoom state
@@ -359,49 +359,6 @@ export function setupZoomHandlers() {
         else if (e.key === '-') fsZoomOut();
         else if (e.key === '0') fsResetZoom();
     });
-
-    // Swipe gestures for iterate
-    let swipeStartY = 0, swipeStartX = 0;
-
-    imageBox.addEventListener('touchstart', e => {
-        if (e.touches.length === 1 && !pinching) {
-            swipeStartY = e.touches[0].clientY;
-            swipeStartX = e.touches[0].clientX;
-        }
-    }, { passive: true });
-
-    imageBox.addEventListener('touchend', e => {
-        if (swipeStartY && e.changedTouches.length === 1 && scale <= 1.1) {
-            const deltaY = swipeStartY - e.changedTouches[0].clientY;
-            const deltaX = Math.abs(swipeStartX - e.changedTouches[0].clientX);
-            if (deltaY > SWIPE_THRESHOLD_Y && deltaX < SWIPE_THRESHOLD_X && currentImg) {
-                // Call iterate through window global
-                if (window.iterate) window.iterate();
-                haptic(30);
-            }
-        }
-        swipeStartY = 0;
-        swipeStartX = 0;
-    }, { passive: true });
-
-    // Swipe down in fullscreen to dismiss
-    let fsSwipeStartY = 0;
-    fsContainer.addEventListener('touchstart', e => {
-        if (e.touches.length === 1 && fsScale <= 1.1) {
-            fsSwipeStartY = e.touches[0].clientY;
-        }
-    }, { passive: true });
-
-    fsContainer.addEventListener('touchend', e => {
-        if (fsSwipeStartY && e.changedTouches.length === 1 && fsScale <= 1.1) {
-            const deltaY = e.changedTouches[0].clientY - fsSwipeStartY;
-            if (deltaY > SWIPE_DISMISS_THRESHOLD) {
-                closeFullscreen();
-                haptic(20);
-            }
-        }
-        fsSwipeStartY = 0;
-    }, { passive: true });
 }
 
 // Make functions globally available for HTML onclick handlers

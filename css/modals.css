@@ -385,3 +385,101 @@
 .preview-actions button {
     flex: 1;
 }
+
+/* ==========================================================================
+   Fullscreen Prompt Editor Modal
+   ========================================================================== */
+
+.prompt-editor-modal {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-body);
+    z-index: var(--z-fullscreen);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-normal);
+}
+
+.prompt-editor-modal.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.prompt-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xl);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--bg-surface);
+}
+
+.prompt-editor-header h3 {
+    margin: 0;
+    font-size: var(--font-size-3xl);
+    color: var(--color-primary);
+}
+
+.prompt-editor-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: var(--spacing-sm);
+}
+
+.prompt-editor-close:hover {
+    color: var(--text-primary);
+}
+
+.prompt-editor-body {
+    flex: 1;
+    padding: var(--spacing-xl);
+    display: flex;
+    flex-direction: column;
+}
+
+.prompt-editor-body textarea {
+    flex: 1;
+    width: 100%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    color: var(--text-primary);
+    font-size: 18px;
+    line-height: 1.6;
+    padding: var(--spacing-xl);
+    resize: none;
+    font-family: var(--font-family);
+}
+
+.prompt-editor-body textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.prompt-editor-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xl);
+    border-top: 1px solid var(--border-default);
+    background: var(--bg-surface);
+}
+
+.prompt-editor-counter {
+    font-size: var(--font-size-lg);
+    color: var(--text-muted);
+}
+
+.prompt-editor-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.prompt-editor-actions button {
+    min-width: 100px;
+}

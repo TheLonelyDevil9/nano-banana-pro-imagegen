@@ -122,6 +122,49 @@ export function scrollToResult() {
     }, 100);
 }
 
+// Fullscreen Prompt Editor
+export function openPromptEditor() {
+    const modal = $('promptEditorModal');
+    const textarea = $('promptEditorTextarea');
+    const mainPrompt = $('prompt');
+
+    // Copy current prompt to editor
+    textarea.value = mainPrompt.value;
+    updatePromptEditorCounter();
+
+    modal.classList.add('open');
+
+    // Focus textarea after animation
+    setTimeout(() => textarea.focus(), 100);
+}
+
+export function closePromptEditor() {
+    $('promptEditorModal').classList.remove('open');
+}
+
+export function applyPromptEditor() {
+    const textarea = $('promptEditorTextarea');
+    const mainPrompt = $('prompt');
+
+    // Copy editor content back to main prompt
+    mainPrompt.value = textarea.value;
+    updateCharCounter();
+
+    // Trigger persistence
+    import('./persistence.js').then(m => m.persistAllInputs());
+
+    closePromptEditor();
+    showToast('Prompt updated');
+}
+
+export function updatePromptEditorCounter() {
+    const len = $('promptEditorTextarea').value.length;
+    $('promptEditorCounter').textContent = len.toLocaleString() + ' characters';
+}
+
 // Make functions globally available for HTML onclick handlers
 window.toggleCollapsible = toggleCollapsible;
 window.toggleApiKeyVisibility = toggleApiKeyVisibility;
+window.openPromptEditor = openPromptEditor;
+window.closePromptEditor = closePromptEditor;
+window.applyPromptEditor = applyPromptEditor;

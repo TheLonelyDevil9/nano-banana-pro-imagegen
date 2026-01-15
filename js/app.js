@@ -3,7 +3,7 @@
  * Initialization and event setup
  */
 
-import { $, debounce, restoreCollapsibleStates, updateCharCounter, updateAspectPreview, updateThinkingLabel } from './ui.js';
+import { $, debounce, restoreCollapsibleStates, updateCharCounter, updateAspectPreview, updateThinkingLabel, openPromptEditor, updatePromptEditorCounter } from './ui.js';
 import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastModel } from './persistence.js';
 import { authMode, restoreServiceAccount, restoreAuthMode, setupAuthDragDrop } from './auth.js';
 import { refreshModels } from './models.js';
@@ -106,6 +106,17 @@ async function init() {
             closePromptsDropdown();
         }
     });
+
+    // Keyboard shortcut: Ctrl+Shift+F to open fullscreen prompt editor
+    document.addEventListener('keydown', e => {
+        if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+            e.preventDefault();
+            openPromptEditor();
+        }
+    });
+
+    // Prompt editor textarea input handler
+    $('promptEditorTextarea')?.addEventListener('input', updatePromptEditorCounter);
 
     // Load models if API key exists
     if ($('apiKey').value.length > 20) {

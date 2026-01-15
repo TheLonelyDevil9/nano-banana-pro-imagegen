@@ -3,7 +3,7 @@
  * API Key and Vertex AI authentication handling
  */
 
-import { VERTEX_SCOPE } from './config.js';
+import { VERTEX_SCOPE, ANTIGRAVITY_DEFAULT_URL } from './config.js';
 import { $, showToast } from './ui.js';
 import { persistInput, loadPersistedInput } from './persistence.js';
 
@@ -14,6 +14,10 @@ export let vertexAccessToken = null;
 export let tokenExpiry = 0;
 let jsrsasignLoaded = false;
 let jsrsasignLoading = false;
+
+// Antigravity state
+export let antigravityUrl = ANTIGRAVITY_DEFAULT_URL;
+export let antigravityApiKey = '';
 
 // Lazy-load jsrsasign library (only needed for Vertex AI)
 async function loadJsrsasign() {
@@ -57,7 +61,7 @@ export function clearToken() {
     tokenExpiry = 0;
 }
 
-// Switch between API Key and Vertex AI modes
+// Switch between API Key, Vertex AI, and Antigravity modes
 export function switchAuthMode(mode) {
     authMode = mode;
     persistInput('authMode', mode);
@@ -79,6 +83,8 @@ export function switchAuthMode(mode) {
         if (mode === 'apikey' && $('apiKey').value.length > 20) {
             m.refreshModels();
         } else if (mode === 'vertex' && serviceAccount && $('projectId').value) {
+            m.refreshModels();
+        } else if (mode === 'antigravity' && $('antigravityUrl')?.value) {
             m.refreshModels();
         }
     });
@@ -230,3 +236,20 @@ export function restoreServiceAccount() {
 // Make functions globally available for HTML onclick handlers
 window.switchAuthMode = switchAuthMode;
 window.handleSAFile = handleSAFile;
+
+// Toggle Antigravity API key visibility
+export function toggleAntigravityKeyVisibility() {
+    const input = $('antigravityApiKey');
+    if (input) input.type = input.type === 'password' ? 'text' : 'password';
+}
+window.toggleAntigravityKeyVisibility = toggleAntigravityKeyVisibility;
+
+// Set Antigravity URL
+export function setAntigravityUrl(url) {
+    antigravityUrl = url;
+}
+
+// Set Antigravity API Key
+export function setAntigravityApiKey(key) {
+    antigravityApiKey = key;
+}
