@@ -41,9 +41,3 @@ export const VERTEX_MODELS = [
   'imagen-3.0-generate-002',
   'imagen-3.0-fast-generate-001'
 ];
-
-// Antigravity Configuration
-export const ANTIGRAVITY_DEFAULT_URL = 'http://localhost:3000';
-export const ANTIGRAVITY_MODELS = [
-  'gemini-3-pro-image-preview'
-];

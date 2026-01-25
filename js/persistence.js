@@ -44,9 +44,6 @@ export function persistAllInputs() {
     persistInput('thinkingBudget', $('thinkingBudget').value);
     persistInput('soundToggle', $('soundToggle')?.checked);
     persistInput('hapticToggle', $('hapticToggle')?.checked);
-    // Antigravity settings
-    if ($('antigravityUrl')) persistInput('antigravityUrl', $('antigravityUrl').value);
-    if ($('antigravityApiKey')) persistInput('antigravityApiKey', $('antigravityApiKey').value);
     // authMode and refImages are persisted by their respective modules
 }
 
@@ -63,10 +60,6 @@ export function restoreAllInputs() {
     const savedHaptic = loadPersistedInput('hapticToggle', true);
     if ($('soundToggle')) $('soundToggle').checked = savedSound;
     if ($('hapticToggle')) $('hapticToggle').checked = savedHaptic;
-
-    // Antigravity settings
-    if ($('antigravityUrl')) $('antigravityUrl').value = loadPersistedInput('antigravityUrl', 'http://localhost:3000');
-    if ($('antigravityApiKey')) $('antigravityApiKey').value = loadPersistedInput('antigravityApiKey', '');
 
     updateThinkingLabel();
     $('thinkingRow').style.display = $('thinkingToggle').checked ? 'block' : 'none';

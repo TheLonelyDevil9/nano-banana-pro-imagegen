@@ -145,7 +145,6 @@
             <div class="auth-tabs">
               <div class="auth-tab active" data-mode="apikey" onclick="switchAuthMode('apikey')">API Key</div>
               <div class="auth-tab" data-mode="vertex" onclick="switchAuthMode('vertex')">Vertex AI</div>
-              <div class="auth-tab" data-mode="antigravity" onclick="switchAuthMode('antigravity')">Antigravity</div>
             </div>
             <div class="auth-content">
               <!-- API Key Panel -->
@@ -165,16 +164,6 @@
                 <!-- Hidden fields - auto-populated from service account -->
                 <input type="hidden" id="projectId">
                 <input type="hidden" id="vertexLocation" value="global">
-              </div>
-              <!-- Antigravity Panel -->
-              <div class="auth-panel" id="antigravityPanel">
-                <label style="font-size:0.7rem;color:#888;">Server URL</label>
-                <input type="text" id="antigravityUrl" placeholder="http://localhost:3000" value="http://localhost:3000">
-                <label style="font-size:0.7rem;color:#888;margin-top:8px;">API Key (optional)</label>
-                <div class="api-key-row">
-                  <input type="password" id="antigravityApiKey" placeholder="Enter API key (if required)">
-                  <button class="btn-toggle-visibility" onclick="toggleAntigravityKeyVisibility()" title="Show/Hide">👁️</button>
-                </div>
               </div>
             </div>
           </div>

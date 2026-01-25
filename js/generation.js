@@ -157,8 +157,6 @@ export async function generate() {
     } else if (authMode === 'vertex') {
         if (!serviceAccount) return showToast('Load service account');
         if (!el.projectId.value) return showToast('Enter project ID');
-    } else if (authMode === 'antigravity') {
-        if (!$('antigravityUrl')?.value) return showToast('Enter Antigravity server URL');
     }
     if (!el.modelSelect.value) return showToast('Select model');
     if (!el.prompt.value.trim()) return showToast('Enter prompt');

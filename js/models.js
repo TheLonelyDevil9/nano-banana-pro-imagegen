@@ -3,7 +3,7 @@
  * Model loading and selection
  */
 
-import { VERTEX_MODELS, ANTIGRAVITY_MODELS } from './config.js';
+import { VERTEX_MODELS } from './config.js';
 import { authMode, serviceAccount, getVertexAccessToken } from './auth.js';
 import { $, showToast } from './ui.js';
 import { restoreLastModel } from './persistence.js';
@@ -42,8 +42,6 @@ export async function refreshModels(forceRefresh = false) {
             await refreshModelsAPIKey();
         } else if (authMode === 'vertex') {
             await refreshModelsVertex();
-        } else if (authMode === 'antigravity') {
-            await refreshModelsAntigravity();
         }
     } catch (e) {
         modelStatus.textContent = e.message.slice(0, 50);
@@ -114,23 +112,6 @@ async function refreshModelsVertex() {
     } catch (e) {
         throw new Error('Auth failed: ' + e.message);
     }
-}
-
-// Refresh models for Antigravity auth
-async function refreshModelsAntigravity() {
-    const modelStatus = $('modelStatus');
-    const url = $('antigravityUrl')?.value;
-
-    if (!url) {
-        modelStatus.textContent = 'Enter server URL';
-        modelStatus.className = 'model-status error';
-        return;
-    }
-
-    // Use predefined models for Antigravity
-    renderModels(ANTIGRAVITY_MODELS);
-    modelStatus.textContent = 'Connected to Antigravity';
-    modelStatus.className = 'model-status success';
 }
 
 // Make functions globally available for HTML onclick handlers

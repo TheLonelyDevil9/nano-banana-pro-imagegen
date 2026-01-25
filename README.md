@@ -12,7 +12,6 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
 
 - **API Key** - Use your Gemini API key directly
 - **Vertex AI** - Enterprise auth with Service Account JSON (JWT signing in-browser)
-- **Antigravity** - Connect to AIClient-2-API for additional models (OpenAI-compatible)
 - Auto-refresh tokens & retry on auth errors
 
 ### Image Generation
@@ -108,13 +107,6 @@ Fork this repo and enable GitHub Pages in Settings → Pages → Deploy from `ma
 3. Download the JSON key file
 4. Drop the file in the app
 
-### Antigravity (AIClient-2-API)
-
-1. Run AIClient-2-API on your local machine or server
-2. Switch to the "Antigravity" tab in the app
-3. Enter the server URL (default: `http://localhost:3000`)
-4. Optionally enter an API key if required
-
 ## Project Structure
 
 ```
@@ -134,7 +126,7 @@ nano-banana-pro/
 ├── js/
 │   ├── app.js          # Entry point & initialization
 │   ├── config.js       # Constants
-│   ├── auth.js         # API key, Vertex AI & Antigravity auth
+│   ├── auth.js         # API key & Vertex AI auth
 │   ├── api.js          # API calls with retry logic
 │   ├── models.js       # Model loading
 │   ├── generation.js   # Image generation orchestration
@@ -162,13 +154,13 @@ All data stays in your browser:
 
 | Type | Storage | Contents |
 |------|---------|----------|
-| Credentials | localStorage | API key, service account JSON, Antigravity settings |
+| Credentials | localStorage | API key, service account JSON |
 | Settings | localStorage | UI preferences, last model |
 | Reference Images | localStorage | Base64 compressed images |
 | Generated Images | IndexedDB | Full images + thumbnails |
 | Session Stats | sessionStorage | Generation count |
 
-**Nothing is sent to any server except the Gemini/Vertex/Antigravity API for generation.**
+**Nothing is sent to any server except the Gemini/Vertex API for generation.**
 
 ## Browser Support
 
