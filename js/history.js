@@ -227,10 +227,18 @@ export function toggleFavorite(id, event) {
 export function deleteHistoryItem(id, event) {
     event.stopPropagation();
     const tx = db.transaction('history', 'readwrite');
-    tx.objectStore('history').delete(id);
-    tx.oncomplete = () => {
-        loadHistory();
-        showToast('Deleted');
+    const store = tx.objectStore('history');
+    store.get(id).onsuccess = e => {
+        const item = e.target.result;
+        if (item && item.isFavorite) {
+            showToast('Remove star to delete');
+            return;
+        }
+        store.delete(id);
+        tx.oncomplete = () => {
+            loadHistory();
+            showToast('Deleted');
+        };
     };
     haptic(15);
 }
