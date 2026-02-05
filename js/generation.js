@@ -306,10 +306,25 @@ export function download() {
 export async function copyImg() {
     if (!currentImg) return;
     try {
-        const blob = await (await fetch(currentImg)).blob();
-        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+        // ClipboardItem only supports image/png in most browsers
+        // Convert to PNG using canvas
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = currentImg;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         showToast('Copied!');
     } catch (e) {
+        console.error('Copy failed:', e);
         showToast('Copy failed');
     }
 }
