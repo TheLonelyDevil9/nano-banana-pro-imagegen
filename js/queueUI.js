@@ -739,13 +739,110 @@ export async function importBatchFile() {
 }
 
 /**
+ * Attempt to repair common JSON syntax errors
+ * @param {string} jsonText - The malformed JSON string
+ * @returns {string} - Repaired JSON string
+ */
+function repairJson(jsonText) {
+    let repaired = jsonText;
+    let fixes = [];
+
+    // Fix 1: Remove trailing commas before ] or }
+    // e.g., {"a": 1,} or [1, 2,]
+    const trailingCommaRegex = /,(\s*[}\]])/g;
+    if (trailingCommaRegex.test(repaired)) {
+        repaired = repaired.replace(trailingCommaRegex, '$1');
+        fixes.push('trailing commas');
+    }
+
+    // Fix 2: Remove stray ] or } that don't belong
+    // Common: "variations": 3 ] } should be "variations": 3 }
+    // Look for pattern: number/string/true/false/null followed by ] then , or }
+    const strayBracketRegex = /(\d+|"[^"]*"|true|false|null)\s*\]\s*([,}])/g;
+    if (strayBracketRegex.test(repaired)) {
+        repaired = repaired.replace(strayBracketRegex, '$1$2');
+        fixes.push('stray brackets');
+    }
+
+    // Fix 3: Add missing commas between objects in array
+    // e.g., } { should be }, {
+    const missingCommaRegex = /}\s*{/g;
+    if (missingCommaRegex.test(repaired)) {
+        repaired = repaired.replace(missingCommaRegex, '}, {');
+        fixes.push('missing commas between objects');
+    }
+
+    // Fix 4: Single quotes to double quotes (common mistake)
+    // Only for keys and simple string values, not inside existing strings
+    const singleQuoteKeyRegex = /'([^']+)'(\s*:)/g;
+    if (singleQuoteKeyRegex.test(repaired)) {
+        repaired = repaired.replace(singleQuoteKeyRegex, '"$1"$2');
+        fixes.push('single-quoted keys');
+    }
+
+    // Fix 5: Unquoted keys (JavaScript style)
+    // e.g., { prompt: "text" } should be { "prompt": "text" }
+    const unquotedKeyRegex = /([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g;
+    if (unquotedKeyRegex.test(repaired)) {
+        repaired = repaired.replace(unquotedKeyRegex, '$1"$2"$3');
+        fixes.push('unquoted keys');
+    }
+
+    // Fix 6: Missing closing bracket/brace at end
+    // Count brackets and add missing ones
+    const openBraces = (repaired.match(/{/g) || []).length;
+    const closeBraces = (repaired.match(/}/g) || []).length;
+    const openBrackets = (repaired.match(/\[/g) || []).length;
+    const closeBrackets = (repaired.match(/]/g) || []).length;
+
+    if (openBraces > closeBraces) {
+        repaired = repaired.trimEnd() + '}'.repeat(openBraces - closeBraces);
+        fixes.push('missing closing braces');
+    }
+    if (openBrackets > closeBrackets) {
+        // Insert before final }
+        const lastBrace = repaired.lastIndexOf('}');
+        if (lastBrace > 0) {
+            repaired = repaired.slice(0, lastBrace) + ']'.repeat(openBrackets - closeBrackets) + repaired.slice(lastBrace);
+        } else {
+            repaired = repaired + ']'.repeat(openBrackets - closeBrackets);
+        }
+        fixes.push('missing closing brackets');
+    }
+
+    if (fixes.length > 0) {
+        console.log('[JSON Repair] Applied fixes:', fixes.join(', '));
+    }
+
+    return repaired;
+}
+
+/**
  * Process batch JSON file
  * @param {File} jsonFile - The JSON file to process
  * @param {FileSystemDirectoryHandle|null} dirHandle - Optional directory handle for loading refs
  */
 async function processBatchJson(jsonFile, dirHandle) {
     const jsonText = await jsonFile.text();
-    const batch = JSON.parse(jsonText);
+
+    let batch;
+    try {
+        batch = JSON.parse(jsonText);
+    } catch (parseError) {
+        // Try to repair common JSON errors
+        console.log('[JSON Repair] Initial parse failed, attempting repair...');
+        console.log('[JSON Repair] Error was:', parseError.message);
+
+        try {
+            const repairedJson = repairJson(jsonText);
+            batch = JSON.parse(repairedJson);
+            showToast('JSON repaired and imported');
+        } catch (repairError) {
+            console.error('[JSON Repair] Repair failed:', repairError);
+            showToast('Invalid JSON: ' + parseError.message);
+            return;
+        }
+    }
 
     if (!batch.prompts || !Array.isArray(batch.prompts)) {
         showToast('Invalid batch.json format');
