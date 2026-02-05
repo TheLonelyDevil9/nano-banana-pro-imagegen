@@ -1440,3 +1440,78 @@ input:checked+.slider:before {
         min-width: 100px;
     }
 }
+
+/* ==========================================================================
+   Queue Progress FAB
+   ========================================================================== */
+
+.queue-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 2px solid var(--color-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.queue-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.queue-fab.hidden {
+    display: none;
+}
+
+.queue-fab.generating {
+    animation: fab-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes fab-pulse {
+    0%, 100% { border-color: var(--color-primary); }
+    50% { border-color: var(--color-primary-hover); box-shadow: 0 4px 20px rgba(234, 179, 8, 0.4); }
+}
+
+.queue-fab-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 0%;
+    background: var(--color-primary);
+    opacity: 0.3;
+    transition: height 0.3s ease;
+}
+
+.queue-fab-text {
+    position: relative;
+    z-index: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .queue-fab {
+        bottom: 80px;
+        right: 16px;
+        width: 48px;
+        height: 48px;
+    }
+
+    .queue-fab-text {
+        font-size: 11px;
+    }
+}

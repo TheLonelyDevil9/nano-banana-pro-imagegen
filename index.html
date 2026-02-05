@@ -310,7 +310,7 @@
         <button class="btn-cancel hidden" id="cancelBtn" onclick="cancelGeneration()">Cancel Generation</button>
 
         <!-- Batch Generate Button -->
-        <button class="btn-batch" id="batchBtn" onclick="openQueueSetup()">Batch Generate</button>
+        <button class="btn-batch" id="batchBtn" onclick="handleBatchButtonClick()">Batch Generate</button>
 
         <!-- Output Folder Section -->
         <div class="output-folder-section">
@@ -564,6 +564,12 @@
     </div>
     <!-- Hidden file input for per-box refs -->
     <input type="file" id="boxRefInput" class="file-hidden" accept="image/*" multiple>
+  </div>
+
+  <!-- Queue Progress FAB -->
+  <div class="queue-fab hidden" id="queueFab" onclick="toggleQueuePanel(true)">
+    <div class="queue-fab-progress" id="queueFabProgress"></div>
+    <span class="queue-fab-text" id="queueFabText">0/0</span>
   </div>
 
   <!-- JavaScript Modules -->

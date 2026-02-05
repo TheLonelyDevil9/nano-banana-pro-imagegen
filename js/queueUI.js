@@ -35,8 +35,14 @@ let stickyDefaults = {
  * Initialize queue UI
  */
 export function initQueueUI() {
-    // Set up progress callback
-    setOnProgress(renderQueuePanel);
+    // Set up progress callback to update both panel and FAB
+    setOnProgress(() => {
+        renderQueuePanel();
+        updateQueueFab();
+    });
+
+    // Initial FAB state
+    updateQueueFab();
 
     // Set up box ref input handler
     const boxRefInput = $('boxRefInput');
@@ -996,6 +1002,54 @@ export function downloadBatchTemplate() {
     showToast('Template downloaded');
 }
 
+/**
+ * Smart batch button handler - opens progress panel if queue active, setup modal if idle
+ */
+export function handleBatchButtonClick() {
+    const state = getQueueState();
+    const hasItems = state.items && state.items.length > 0;
+    const isActive = state.isRunning || hasItems;
+
+    if (isActive) {
+        toggleQueuePanel(true);
+    } else {
+        openQueueSetup();
+    }
+}
+
+/**
+ * Update the floating queue indicator (FAB)
+ */
+export function updateQueueFab() {
+    const fab = $('queueFab');
+    const fabText = $('queueFabText');
+    const fabProgress = $('queueFabProgress');
+
+    if (!fab) return;
+
+    const state = getQueueState();
+    const stats = getQueueStats();
+
+    // Show/hide FAB based on queue state
+    const shouldShow = state.isRunning || stats.total > 0;
+    fab.classList.toggle('hidden', !shouldShow);
+
+    if (!shouldShow) return;
+
+    // Update text
+    if (fabText) {
+        fabText.textContent = `${stats.completed}/${stats.total}`;
+    }
+
+    // Update progress bar
+    if (fabProgress) {
+        fabProgress.style.height = stats.percentComplete + '%';
+    }
+
+    // Add/remove generating animation
+    fab.classList.toggle('generating', state.isRunning && !state.isPaused);
+}
+
 // Make functions globally available
 window.openQueueSetup = openQueueSetup;
 window.closeQueueSetup = closeQueueSetup;
@@ -1018,3 +1072,4 @@ window.selectAllBoxes = selectAllBoxes;
 window.deselectAllBoxes = deselectAllBoxes;
 window.openBulkRefPicker = openBulkRefPicker;
 window.clearSelectedBoxRefs = clearSelectedBoxRefs;
+window.handleBatchButtonClick = handleBatchButtonClick;
