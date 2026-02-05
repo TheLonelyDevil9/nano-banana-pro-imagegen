@@ -15,6 +15,12 @@ export const MAX_REFS = 14;
 // History Configuration
 export const HISTORY_PAGE_SIZE = 15;
 
+// Queue Configuration
+export const DEFAULT_QUEUE_DELAY_MS = 3000;
+export const MAX_QUEUE_ITEMS = 100;
+export const MAX_VARIATIONS_PER_PROMPT = 10;
+export const QUEUE_STORAGE_KEY = 'queue_state';
+
 // Generation Configuration
 export const MAX_CONVERSATION_TURNS = 10;
 

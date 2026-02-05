@@ -5,6 +5,7 @@
 
 import { HISTORY_PAGE_SIZE } from './config.js';
 import { $, showToast, haptic } from './ui.js';
+import { setFilesystemDB, loadImageFromFilesystem, deleteFromFilesystem, getDirectoryInfo } from './filesystem.js';
 
 // History state
 let db = null;
@@ -17,11 +18,18 @@ let currentPreviewItem = null;
 // Initialize IndexedDB
 export function initDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open('NanoBananaDB', 2);
+        const req = indexedDB.open('NanoBananaDB', 3);
         req.onerror = () => reject(req.error);
-        req.onsuccess = () => { db = req.result; resolve(); };
+        req.onsuccess = () => {
+            db = req.result;
+            // Share db with filesystem module
+            setFilesystemDB(db);
+            resolve();
+        };
         req.onupgradeneeded = e => {
             const database = e.target.result;
+            const oldVersion = e.oldVersion;
+
             // History store (v1)
             if (!database.objectStoreNames.contains('history')) {
                 const historyStore = database.createObjectStore('history', { keyPath: 'id' });
@@ -36,7 +44,52 @@ export function initDB() {
             if (!database.objectStoreNames.contains('refImages')) {
                 database.createObjectStore('refImages', { keyPath: 'id' });
             }
+            // Settings store (v3) - for filesystem handle persistence
+            if (!database.objectStoreNames.contains('settings')) {
+                database.createObjectStore('settings', { keyPath: 'id' });
+            }
+
+            // Migration: mark existing history items as not having filesystem files
+            if (oldVersion < 3 && oldVersion > 0) {
+                console.log('Migrating history items to v3 schema...');
+                // Migration happens after upgrade completes
+            }
         };
+    }).then(() => migrateHistoryItems());
+}
+
+// Migrate existing history items to new schema
+async function migrateHistoryItems() {
+    if (!db) return;
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('history', 'readwrite');
+        const store = tx.objectStore('history');
+        let migratedCount = 0;
+
+        store.openCursor().onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+                const item = cursor.value;
+                // Add new fields if missing
+                if (item.hasFileSystemFile === undefined) {
+                    item.hasFileSystemFile = false;
+                    item.filename = null;
+                    item.resolution = null;
+                    cursor.update(item);
+                    migratedCount++;
+                }
+                cursor.continue();
+            }
+        };
+
+        tx.oncomplete = () => {
+            if (migratedCount > 0) {
+                console.log(`Migrated ${migratedCount} history items to v3 schema`);
+            }
+            resolve();
+        };
+        tx.onerror = () => resolve();
     });
 }
 
@@ -45,13 +98,13 @@ export function getDB() {
     return db;
 }
 
-// Save image to history with thumbnail
+// Save image to history with thumbnail (LEGACY - stores full image)
 export function saveToHistory(imageData, promptText, model) {
     if (!db) {
         console.error('saveToHistory: Database not initialized');
         return;
     }
-    
+
     const img = new Image();
     img.onload = () => {
         try {
@@ -73,7 +126,10 @@ export function saveToHistory(imageData, promptText, model) {
                 prompt: promptText,
                 model: model,
                 timestamp: Date.now(),
-                isFavorite: false
+                isFavorite: false,
+                hasFileSystemFile: false,
+                filename: null,
+                resolution: { width: img.naturalWidth, height: img.naturalHeight }
             });
             tx.oncomplete = () => {
                 console.log('Image saved to history');
@@ -85,6 +141,62 @@ export function saveToHistory(imageData, promptText, model) {
     };
     img.onerror = (e) => console.error('saveToHistory image load error:', e);
     img.src = imageData;
+}
+
+// Save to history with thumbnail only (for filesystem mode)
+export function saveToHistoryThumbnailOnly(imageData, promptText, model, filename) {
+    if (!db) {
+        console.error('saveToHistoryThumbnailOnly: Database not initialized');
+        return Promise.reject(new Error('Database not initialized'));
+    }
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                // Generate thumbnail
+                const canvas = document.createElement('canvas');
+                const maxSize = 150;
+                const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+                canvas.width = img.width * ratio;
+                canvas.height = img.height * ratio;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const thumbnail = canvas.toDataURL('image/png');
+
+                const tx = db.transaction('history', 'readwrite');
+                tx.onerror = (e) => {
+                    console.error('saveToHistoryThumbnailOnly transaction error:', e);
+                    reject(e);
+                };
+                tx.objectStore('history').add({
+                    id: 'img-' + Date.now(),
+                    // NO imageData - only thumbnail for new filesystem-backed items
+                    thumbnail: thumbnail,
+                    prompt: promptText,
+                    model: model,
+                    timestamp: Date.now(),
+                    isFavorite: false,
+                    hasFileSystemFile: !!filename,
+                    filename: filename,
+                    resolution: { width: img.naturalWidth, height: img.naturalHeight }
+                });
+                tx.oncomplete = () => {
+                    console.log('Thumbnail saved to history (filesystem mode)');
+                    loadHistory();
+                    resolve();
+                };
+            } catch (e) {
+                console.error('saveToHistoryThumbnailOnly error:', e);
+                reject(e);
+            }
+        };
+        img.onerror = (e) => {
+            console.error('saveToHistoryThumbnailOnly image load error:', e);
+            reject(e);
+        };
+        img.src = imageData;
+    });
 }
 
 // Load history from IndexedDB
@@ -164,6 +276,9 @@ function renderHistoryItems(append = false) {
 function createHistoryItemElement(item) {
     const div = document.createElement('div');
     div.className = 'history-item';
+    if (item.hasFileSystemFile) {
+        div.classList.add('has-file');
+    }
     div.onclick = () => loadHistoryItem(item.id);
 
     const deleteBtn = document.createElement('button');
@@ -223,38 +338,89 @@ export function toggleFavorite(id, event) {
     haptic(15);
 }
 
-// Delete history item
-export function deleteHistoryItem(id, event) {
+// Delete history item (also deletes from filesystem if applicable)
+export async function deleteHistoryItem(id, event) {
     event.stopPropagation();
-    const tx = db.transaction('history', 'readwrite');
-    const store = tx.objectStore('history');
-    store.get(id).onsuccess = e => {
-        const item = e.target.result;
-        if (item && item.isFavorite) {
-            showToast('Remove star to delete');
-            return;
+
+    // First get the item to check if it's favorited and has a file
+    const item = await new Promise((resolve) => {
+        const tx = db.transaction('history', 'readonly');
+        tx.objectStore('history').get(id).onsuccess = e => resolve(e.target.result);
+    });
+
+    if (!item) return;
+
+    if (item.isFavorite) {
+        showToast('Remove star to delete');
+        return;
+    }
+
+    // Delete from filesystem if it has a file
+    if (item.hasFileSystemFile && item.filename) {
+        try {
+            await deleteFromFilesystem(item.filename);
+            console.log('Deleted file from filesystem:', item.filename);
+        } catch (e) {
+            console.warn('Could not delete from filesystem:', e);
+            // Continue with IndexedDB deletion anyway
         }
-        store.delete(id);
-        tx.oncomplete = () => {
-            loadHistory();
-            showToast('Deleted');
-        };
+    }
+
+    // Delete from IndexedDB
+    const tx = db.transaction('history', 'readwrite');
+    tx.objectStore('history').delete(id);
+    tx.oncomplete = () => {
+        loadHistory();
+        showToast('Deleted');
     };
+
     haptic(15);
 }
 
 // Load history item for preview
-export function loadHistoryItem(id) {
-    const tx = db.transaction('history', 'readonly');
-    tx.objectStore('history').get(id).onsuccess = e => {
-        const item = e.target.result;
-        if (item) {
-            currentPreviewItem = item;
-            $('previewImg').src = item.imageData;
-            $('previewPrompt').textContent = item.prompt;
-            $('previewModal').classList.add('open');
+export async function loadHistoryItem(id) {
+    const item = await new Promise((resolve) => {
+        const tx = db.transaction('history', 'readonly');
+        tx.objectStore('history').get(id).onsuccess = e => resolve(e.target.result);
+    });
+
+    if (!item) return;
+
+    currentPreviewItem = item;
+    $('previewPrompt').textContent = item.prompt;
+    $('previewModal').classList.add('open');
+
+    // Determine image source
+    let imageSource = null;
+
+    // Try to load from filesystem first if available
+    if (item.hasFileSystemFile && item.filename) {
+        try {
+            const dirInfo = getDirectoryInfo();
+            if (dirInfo.isSet) {
+                imageSource = await loadImageFromFilesystem(item.filename);
+                console.log('Loaded full image from filesystem');
+            }
+        } catch (e) {
+            console.warn('Could not load from filesystem, falling back:', e);
         }
-    };
+    }
+
+    // Fallback to stored imageData (legacy items)
+    if (!imageSource && item.imageData) {
+        imageSource = item.imageData;
+    }
+
+    // Last resort: use thumbnail
+    if (!imageSource) {
+        imageSource = item.thumbnail;
+        console.log('Using thumbnail as fallback (file not accessible)');
+    }
+
+    $('previewImg').src = imageSource;
+
+    // Update currentPreviewItem with the loaded image for use/download
+    currentPreviewItem.loadedImageData = imageSource;
 }
 
 // Close preview modal
@@ -268,13 +434,17 @@ export function closePreview(e) {
 export function useHistoryItem(setCurrentImg, resetZoom) {
     if (!currentPreviewItem) return;
 
-    setCurrentImg(currentPreviewItem.imageData);
+    const imageData = currentPreviewItem.loadedImageData || currentPreviewItem.imageData || currentPreviewItem.thumbnail;
+
+    setCurrentImg(imageData);
     $('prompt').value = currentPreviewItem.prompt;
-    $('resultImg').src = currentPreviewItem.imageData;
+    $('resultImg').src = imageData;
     $('resultImg').classList.remove('hidden');
     $('placeholder').classList.add('hidden');
     $('imageBox').classList.add('has-image');
     $('iterateBtn').disabled = $('downloadBtn').disabled = $('copyBtn').disabled = false;
+    $('regenerateBtn').disabled = false;
+    $('clearOutputBtn').disabled = false;
 
     closePreview();
     toggleHistory();
@@ -284,15 +454,47 @@ export function useHistoryItem(setCurrentImg, resetZoom) {
 // Download preview image
 export function downloadPreview() {
     if (!currentPreviewItem) return;
+    const imageData = currentPreviewItem.loadedImageData || currentPreviewItem.imageData || currentPreviewItem.thumbnail;
     const a = document.createElement('a');
-    a.href = currentPreviewItem.imageData;
-    a.download = 'nano-banana-' + Date.now() + '.png';
+    a.href = imageData;
+    a.download = currentPreviewItem.filename || ('nano-banana-' + Date.now() + '.png');
     a.click();
 }
 
-// Clear all non-favorite history
-export function clearHistory() {
-    if (!confirm('Clear all non-favorite history?')) return;
+// Clear all non-favorite history (also clears filesystem files)
+export async function clearHistory() {
+    if (!confirm('Clear all non-favorite history? This will also delete files from the output folder.')) return;
+
+    const itemsToDelete = [];
+
+    // First collect all items to delete
+    await new Promise((resolve) => {
+        const tx = db.transaction('history', 'readonly');
+        tx.objectStore('history').openCursor().onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+                if (!cursor.value.isFavorite) {
+                    itemsToDelete.push(cursor.value);
+                }
+                cursor.continue();
+            } else {
+                resolve();
+            }
+        };
+    });
+
+    // Delete files from filesystem
+    for (const item of itemsToDelete) {
+        if (item.hasFileSystemFile && item.filename) {
+            try {
+                await deleteFromFilesystem(item.filename);
+            } catch (e) {
+                console.warn('Could not delete file:', item.filename, e);
+            }
+        }
+    }
+
+    // Delete from IndexedDB
     const tx = db.transaction('history', 'readwrite');
     const store = tx.objectStore('history');
     store.openCursor().onsuccess = e => {
@@ -304,7 +506,10 @@ export function clearHistory() {
             cursor.continue();
         }
     };
-    tx.oncomplete = () => { loadHistory(); showToast('Cleared (favorites kept)'); };
+    tx.oncomplete = () => {
+        loadHistory();
+        showToast('Cleared (favorites kept)');
+    };
 }
 
 // Get current preview item (for external use)
