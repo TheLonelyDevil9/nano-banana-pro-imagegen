@@ -1,9 +1,9 @@
 /**
  * Queue UI Module
- * Renders queue panel, progress, setup modal
+ * Prompt boxes management, rendering, import/export
  */
 
-import { $ } from './ui.js';
+import { $, showToast } from './ui.js';
 import {
     getQueueState,
     getQueueStats,
@@ -14,8 +14,12 @@ import {
 } from './queue.js';
 import { getCurrentConfig } from './generation.js';
 import { getDirectoryInfo, selectOutputDirectory } from './filesystem.js';
-import { refImages } from './references.js';
-import { MAX_VARIATIONS_PER_PROMPT, DEFAULT_QUEUE_DELAY_MS } from './config.js';
+import { refImages, compressImage } from './references.js';
+import { MAX_REFS, DEFAULT_QUEUE_DELAY_MS } from './config.js';
+
+// Prompt boxes state
+let promptBoxes = [];
+let currentBoxForRefs = null;
 
 /**
  * Initialize queue UI
@@ -24,8 +28,11 @@ export function initQueueUI() {
     // Set up progress callback
     setOnProgress(renderQueuePanel);
 
-    // Set up event listeners
-    setupQueueSetupModal();
+    // Set up box ref input handler
+    const boxRefInput = $('boxRefInput');
+    if (boxRefInput) {
+        boxRefInput.addEventListener('change', handleBoxRefInput);
+    }
 
     // Initial render
     renderQueuePanel();
@@ -33,55 +40,232 @@ export function initQueueUI() {
 }
 
 /**
- * Setup queue modal event listeners
+ * Generate unique ID for prompt box
  */
-function setupQueueSetupModal() {
-    const promptsInput = $('queuePromptsInput');
-    const variationsSlider = $('variationsSlider');
+function generateBoxId() {
+    return 'pb_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
-    if (promptsInput) {
-        promptsInput.addEventListener('input', updateQueueCounts);
-    }
+/**
+ * Add a new prompt box
+ */
+export function addPromptBox(prompt = '', variations = 1, boxRefImages = null) {
+    const box = {
+        id: generateBoxId(),
+        prompt: prompt,
+        variations: variations,
+        refImages: boxRefImages  // null = use global refs
+    };
+    promptBoxes.push(box);
+    renderPromptBoxes();
+    updateTotalCount();
 
-    if (variationsSlider) {
-        variationsSlider.addEventListener('input', () => {
-            $('variationsLabel').textContent = variationsSlider.value;
-            updateQueueCounts();
-        });
+    // Focus the new textarea
+    setTimeout(() => {
+        const textarea = document.querySelector(`[data-box-id="${box.id}"] .prompt-box-textarea`);
+        if (textarea) textarea.focus();
+    }, 50);
+}
+
+/**
+ * Remove a prompt box
+ */
+export function removePromptBox(id) {
+    promptBoxes = promptBoxes.filter(box => box.id !== id);
+    renderPromptBoxes();
+    updateTotalCount();
+}
+
+/**
+ * Update a prompt box
+ */
+export function updatePromptBox(id, updates) {
+    const box = promptBoxes.find(b => b.id === id);
+    if (box) {
+        Object.assign(box, updates);
+        updateTotalCount();
     }
 }
 
 /**
- * Update prompt and total image counts
+ * Set variations for a prompt box
  */
-function updateQueueCounts() {
-    const promptsInput = $('queuePromptsInput');
-    const variationsSlider = $('variationsSlider');
+export function setBoxVariations(id, variations) {
+    updatePromptBox(id, { variations: parseInt(variations) || 1 });
+    // Re-render just the variation buttons
+    const footer = document.querySelector(`[data-box-id="${id}"] .prompt-box-footer`);
+    if (footer) {
+        const box = promptBoxes.find(b => b.id === id);
+        if (box) {
+            const btns = footer.querySelectorAll('.variation-btn');
+            btns.forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.val) === box.variations);
+            });
+        }
+    }
+}
 
-    if (!promptsInput || !variationsSlider) return;
+/**
+ * Open file picker for box refs
+ */
+export function openBoxRefPicker(boxId) {
+    currentBoxForRefs = boxId;
+    const input = $('boxRefInput');
+    if (input) {
+        input.value = '';
+        input.click();
+    }
+}
 
-    const prompts = promptsInput.value
-        .split('\n')
-        .map(p => p.trim())
-        .filter(p => p.length > 0);
+/**
+ * Handle box ref file input
+ */
+async function handleBoxRefInput(e) {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !currentBoxForRefs) return;
 
-    const promptCount = prompts.length;
-    const variations = parseInt(variationsSlider.value) || 1;
-    const totalImages = promptCount * variations;
+    const box = promptBoxes.find(b => b.id === currentBoxForRefs);
+    if (!box) return;
 
-    const promptCountEl = $('promptCount');
+    // Initialize refImages array if null
+    if (!box.refImages) {
+        box.refImages = [];
+    }
+
+    for (const file of files) {
+        if (box.refImages.length >= MAX_REFS) {
+            showToast(`Maximum ${MAX_REFS} reference images per prompt`);
+            break;
+        }
+        if (!file.type.startsWith('image/')) continue;
+
+        try {
+            const dataUrl = await fileToDataUrl(file);
+            const compressed = await compressImage(dataUrl);
+            box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
+        } catch (err) {
+            console.error('Error processing file:', err);
+        }
+    }
+
+    renderPromptBoxes();
+    currentBoxForRefs = null;
+}
+
+/**
+ * Clear custom refs from a box (revert to global)
+ */
+export function clearBoxRefs(id) {
+    updatePromptBox(id, { refImages: null });
+    renderPromptBoxes();
+}
+
+/**
+ * Remove a single ref from a box
+ */
+export function removeBoxRef(boxId, refId) {
+    const box = promptBoxes.find(b => b.id === boxId);
+    if (box && box.refImages) {
+        box.refImages = box.refImages.filter(r => r.id !== refId);
+        if (box.refImages.length === 0) {
+            box.refImages = null;  // Revert to global
+        }
+        renderPromptBoxes();
+    }
+}
+
+/**
+ * Update total count display
+ */
+function updateTotalCount() {
+    const promptCount = promptBoxes.filter(b => b.prompt.trim().length > 0).length;
+    const totalImages = promptBoxes.reduce((sum, box) => {
+        return sum + (box.prompt.trim().length > 0 ? box.variations : 0);
+    }, 0);
+
+    const promptCountEl = $('promptBoxCount');
     const totalImagesEl = $('totalImagesCount');
+    const startBtn = $('startQueueBtn');
 
     if (promptCountEl) promptCountEl.textContent = promptCount;
     if (totalImagesEl) totalImagesEl.textContent = totalImages;
 
-    // Update start button
-    const startBtn = $('startQueueBtn');
     if (startBtn) {
         startBtn.disabled = promptCount === 0;
-        startBtn.textContent = promptCount > 0
-            ? `Start Batch (${totalImages} images)`
-            : 'Start Batch Generation';
+        startBtn.textContent = promptCount > 0 ? `Start Batch (${totalImages})` : 'Start Batch';
+    }
+}
+
+/**
+ * Render all prompt boxes
+ */
+function renderPromptBoxes() {
+    const container = $('promptBoxesContainer');
+    if (!container) return;
+
+    if (promptBoxes.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = promptBoxes.map((box, index) => {
+        const hasCustomRefs = box.refImages && box.refImages.length > 0;
+
+        return `
+            <div class="prompt-box" data-box-id="${box.id}">
+                <div class="prompt-box-header">
+                    <span class="prompt-box-title">Prompt ${index + 1}</span>
+                    <button class="prompt-box-remove" onclick="removePromptBox('${box.id}')" title="Remove">×</button>
+                </div>
+                <div class="prompt-box-body">
+                    <textarea class="prompt-box-textarea"
+                        placeholder="Enter your prompt..."
+                        oninput="updateBoxPrompt('${box.id}', this.value)">${escapeHtml(box.prompt)}</textarea>
+                </div>
+                <div class="prompt-box-footer">
+                    <div class="prompt-box-variations">
+                        <label>Variations:</label>
+                        <div class="variation-btns">
+                            ${[1, 2, 3, 4, 5].map(v => `
+                                <button class="variation-btn ${box.variations === v ? 'active' : ''}"
+                                    data-val="${v}"
+                                    onclick="setBoxVariations('${box.id}', ${v})">${v}</button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="prompt-box-refs">
+                        <label>Refs:</label>
+                        ${hasCustomRefs ? `
+                            <div class="prompt-box-refs-thumbs">
+                                ${box.refImages.slice(0, 4).map(ref => `
+                                    <img src="${ref.data}" class="prompt-box-ref-thumb" title="Click to remove" onclick="removeBoxRef('${box.id}', ${ref.id})">
+                                `).join('')}
+                                ${box.refImages.length > 4 ? `<span style="color:var(--text-muted);font-size:0.75rem;">+${box.refImages.length - 4}</span>` : ''}
+                            </div>
+                        ` : `
+                            <span class="prompt-box-refs-info">(using global)</span>
+                        `}
+                        <div class="prompt-box-refs-actions">
+                            <button class="btn-secondary btn-sm" onclick="openBoxRefPicker('${box.id}')">Add</button>
+                            ${hasCustomRefs ? `
+                                <button class="btn-secondary btn-sm" onclick="clearBoxRefs('${box.id}')">Clear</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Update box prompt from textarea
+ */
+export function updateBoxPrompt(id, value) {
+    const box = promptBoxes.find(b => b.id === id);
+    if (box) {
+        box.prompt = value;
+        updateTotalCount();
     }
 }
 
@@ -92,20 +276,26 @@ export function openQueueSetup() {
     const modal = $('queueSetupModal');
     if (modal) {
         modal.classList.add('open');
-        updateQueueCounts();
-        updateDirectoryDisplay();
 
-        // Update use refs checkbox based on current refs
-        const useRefsCheckbox = $('useCurrentRefs');
-        const refsInfo = $('currentRefsInfo');
-        if (useRefsCheckbox && refsInfo) {
-            const hasRefs = refImages.length > 0;
-            useRefsCheckbox.disabled = !hasRefs;
-            useRefsCheckbox.checked = hasRefs;
-            refsInfo.textContent = hasRefs
-                ? `(${refImages.length} images)`
-                : '(none)';
+        // Add one empty box if none exist
+        if (promptBoxes.length === 0) {
+            addPromptBox();
+        } else {
+            renderPromptBoxes();
         }
+
+        // Update global refs display
+        const globalRefsInfo = $('globalRefsInfo');
+        const useGlobalRefs = $('useGlobalRefs');
+        if (globalRefsInfo && useGlobalRefs) {
+            const hasRefs = refImages.length > 0;
+            globalRefsInfo.textContent = hasRefs ? `(${refImages.length} images)` : '(none)';
+            useGlobalRefs.disabled = !hasRefs;
+            useGlobalRefs.checked = hasRefs;
+        }
+
+        updateDirectoryDisplay();
+        updateTotalCount();
     }
 }
 
@@ -123,47 +313,45 @@ export function closeQueueSetup() {
  * Confirm and start queue from modal
  */
 export function confirmAndStartQueue() {
-    const promptsInput = $('queuePromptsInput');
-    const variationsSlider = $('variationsSlider');
     const delaySelect = $('queueDelaySelect');
-    const useRefsCheckbox = $('useCurrentRefs');
+    const useGlobalRefs = $('useGlobalRefs');
 
-    if (!promptsInput) return;
+    // Filter to only boxes with prompts
+    const validBoxes = promptBoxes.filter(box => box.prompt.trim().length > 0);
 
-    const prompts = promptsInput.value
-        .split('\n')
-        .map(p => p.trim())
-        .filter(p => p.length > 0);
-
-    if (prompts.length === 0) {
+    if (validBoxes.length === 0) {
         showToast('Enter at least one prompt');
         return;
     }
 
-    const variations = parseInt(variationsSlider?.value) || 1;
     const delayMs = parseInt(delaySelect?.value) || DEFAULT_QUEUE_DELAY_MS;
-    const useRefs = useRefsCheckbox?.checked && refImages.length > 0;
+    const shouldUseGlobalRefs = useGlobalRefs?.checked && refImages.length > 0;
 
-    // Get current config
+    // Get current config from main page
     const config = getCurrentConfig();
 
     // Set delay
     setQueueDelay(delayMs);
 
-    // Add to queue
-    addToQueue(
-        prompts,
-        variations,
-        config,
-        useRefs ? [...refImages] : []
-    );
+    // Add each box to queue
+    for (const box of validBoxes) {
+        // Determine which refs to use
+        let boxRefs = [];
+        if (box.refImages && box.refImages.length > 0) {
+            boxRefs = [...box.refImages];
+        } else if (shouldUseGlobalRefs) {
+            boxRefs = [...refImages];
+        }
+
+        // Add to queue
+        addToQueue([box.prompt], box.variations, config, boxRefs);
+    }
 
     // Close modal
     closeQueueSetup();
 
-    // Clear input for next time
-    promptsInput.value = '';
-    updateQueueCounts();
+    // Clear prompt boxes for next time
+    promptBoxes = [];
 
     // Open queue panel
     toggleQueuePanel(true);
@@ -345,6 +533,149 @@ export async function selectQueueOutputDir() {
 }
 
 /**
+ * Import batch from folder
+ * Expected structure:
+ *   folder/
+ *     batch.json
+ *     refs/
+ *       image1.png
+ *       image2.jpg
+ */
+export async function importBatchFolder() {
+    try {
+        const dirHandle = await window.showDirectoryPicker();
+
+        // Look for batch.json
+        let jsonHandle;
+        try {
+            jsonHandle = await dirHandle.getFileHandle('batch.json');
+        } catch {
+            showToast('No batch.json found in folder');
+            return;
+        }
+
+        const jsonFile = await jsonHandle.getFile();
+        const jsonText = await jsonFile.text();
+        const batch = JSON.parse(jsonText);
+
+        if (!batch.prompts || !Array.isArray(batch.prompts)) {
+            showToast('Invalid batch.json format');
+            return;
+        }
+
+        // Clear existing prompt boxes
+        promptBoxes = [];
+
+        // Process each prompt
+        for (const item of batch.prompts) {
+            if (!item.prompt) continue;
+
+            const box = {
+                id: generateBoxId(),
+                prompt: item.prompt,
+                variations: item.variations || 1,
+                refImages: null
+            };
+
+            // Load refs if specified
+            if (item.refs && Array.isArray(item.refs) && item.refs.length > 0) {
+                box.refImages = [];
+                for (const refPath of item.refs) {
+                    try {
+                        // Handle nested paths (e.g., "refs/image.png")
+                        const pathParts = refPath.split('/');
+                        let fileHandle = dirHandle;
+
+                        for (let i = 0; i < pathParts.length - 1; i++) {
+                            fileHandle = await fileHandle.getDirectoryHandle(pathParts[i]);
+                        }
+                        fileHandle = await fileHandle.getFileHandle(pathParts[pathParts.length - 1]);
+
+                        const file = await fileHandle.getFile();
+                        const dataUrl = await fileToDataUrl(file);
+                        const compressed = await compressImage(dataUrl);
+                        box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
+                    } catch (err) {
+                        console.warn('Could not load ref:', refPath, err);
+                    }
+                }
+                if (box.refImages.length === 0) {
+                    box.refImages = null;
+                }
+            }
+
+            promptBoxes.push(box);
+        }
+
+        // Set delay if specified
+        if (batch.delay && $('queueDelaySelect')) {
+            $('queueDelaySelect').value = batch.delay.toString();
+        }
+
+        renderPromptBoxes();
+        updateTotalCount();
+
+        const totalImages = promptBoxes.reduce((sum, b) => sum + b.variations, 0);
+        showToast(`Imported ${promptBoxes.length} prompts (${totalImages} images)`);
+
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error('Import error:', err);
+            showToast('Import failed: ' + err.message);
+        }
+    }
+}
+
+/**
+ * Export current prompt boxes to JSON
+ */
+export async function exportBatchJson() {
+    if (promptBoxes.length === 0) {
+        showToast('No prompts to export');
+        return;
+    }
+
+    const batch = {
+        delay: parseInt($('queueDelaySelect')?.value) || DEFAULT_QUEUE_DELAY_MS,
+        prompts: promptBoxes.map(box => {
+            const item = {
+                prompt: box.prompt,
+                variations: box.variations
+            };
+            // Note: We don't export ref image data, just indicate if custom refs were set
+            if (box.refImages && box.refImages.length > 0) {
+                item.refs = box.refImages.map((_, i) => `refs/prompt_${box.id}_ref_${i}.png`);
+            }
+            return item;
+        })
+    };
+
+    const jsonStr = JSON.stringify(batch, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'batch.json';
+    a.click();
+
+    URL.revokeObjectURL(url);
+    showToast('Exported batch.json');
+}
+
+/**
+ * Convert File to data URL
+ */
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
  * Escape HTML for safe rendering
  */
 function escapeHtml(text) {
@@ -359,3 +690,12 @@ window.closeQueueSetup = closeQueueSetup;
 window.confirmAndStartQueue = confirmAndStartQueue;
 window.toggleQueuePanel = toggleQueuePanel;
 window.selectQueueOutputDir = selectQueueOutputDir;
+window.addPromptBox = addPromptBox;
+window.removePromptBox = removePromptBox;
+window.updateBoxPrompt = updateBoxPrompt;
+window.setBoxVariations = setBoxVariations;
+window.openBoxRefPicker = openBoxRefPicker;
+window.clearBoxRefs = clearBoxRefs;
+window.removeBoxRef = removeBoxRef;
+window.importBatchFolder = importBatchFolder;
+window.exportBatchJson = exportBatchJson;

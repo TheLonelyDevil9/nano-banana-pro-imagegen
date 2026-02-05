@@ -492,59 +492,67 @@
     </div>
   </div>
 
-  <!-- Queue Setup Modal -->
-  <div class="queue-modal" id="queueSetupModal">
-    <div class="queue-modal-content">
+  <!-- Queue Setup Modal (Fullscreen) -->
+  <div class="queue-modal fullscreen" id="queueSetupModal">
+    <div class="queue-modal-content fullscreen">
       <div class="queue-modal-header">
         <h3>Batch Generation Setup</h3>
-        <button class="close-btn" onclick="closeQueueSetup()">×</button>
-      </div>
-      <div class="queue-modal-body">
-        <div class="queue-section">
-          <label>Prompts <span style="color:var(--text-dim);font-size:0.65rem;">(one per line)</span></label>
-          <textarea id="queuePromptsInput" rows="6" placeholder="Enter each prompt on a new line..."></textarea>
-          <div class="queue-prompts-count">
-            <span id="promptCount">0</span> prompts
-          </div>
-        </div>
-        <div class="queue-section">
-          <label>Variations per prompt</label>
-          <div class="queue-variations-row">
-            <input type="range" id="variationsSlider" min="1" max="10" value="1">
-            <span id="variationsLabel">1</span>
-          </div>
-          <div class="queue-total">
-            Total images: <strong id="totalImagesCount">0</strong>
-          </div>
-        </div>
-        <div class="queue-section">
-          <label>Output Folder</label>
-          <div class="directory-picker">
-            <button class="btn-secondary btn-sm" onclick="selectQueueOutputDir()">📁 Select Folder</button>
-            <span class="dir-name" id="queueDirName">Not set</span>
-          </div>
-        </div>
-        <div class="queue-section">
-          <label>Delay between generations</label>
-          <select id="queueDelaySelect">
-            <option value="2000">2 seconds</option>
-            <option value="3000" selected>3 seconds</option>
-            <option value="5000">5 seconds</option>
-            <option value="10000">10 seconds</option>
-          </select>
-        </div>
-        <div class="queue-section">
-          <div class="toggle-item">
-            <input type="checkbox" id="useCurrentRefs" checked>
-            <label for="useCurrentRefs" style="text-transform:none;color:var(--text-secondary);">Use current reference images <span id="currentRefsInfo" style="color:var(--text-dim);font-size:0.65rem;">(none)</span></label>
-          </div>
+        <div class="queue-modal-header-actions">
+          <button class="btn-secondary btn-sm" onclick="importBatchFolder()" title="Import from folder">Import</button>
+          <button class="btn-secondary btn-sm" onclick="exportBatchJson()" title="Export prompts">Export</button>
+          <button class="close-btn" onclick="closeQueueSetup()">×</button>
         </div>
       </div>
-      <div class="queue-modal-footer">
-        <button class="btn-secondary" onclick="closeQueueSetup()">Cancel</button>
-        <button class="btn-primary" id="startQueueBtn" onclick="confirmAndStartQueue()" disabled>Start Batch Generation</button>
+      <div class="queue-modal-body fullscreen">
+        <!-- Prompt Boxes Container -->
+        <div class="prompt-boxes-container" id="promptBoxesContainer">
+          <!-- Prompt boxes rendered dynamically by JS -->
+        </div>
+
+        <!-- Add Prompt Button -->
+        <button class="btn-add-prompt" onclick="addPromptBox()">+ Add Prompt</button>
+
+        <!-- Global Settings -->
+        <div class="queue-global-settings">
+          <div class="queue-global-row">
+            <div class="queue-global-item">
+              <label>Default Refs</label>
+              <div class="toggle-item">
+                <input type="checkbox" id="useGlobalRefs" checked>
+                <span id="globalRefsInfo" style="color:var(--text-muted);font-size:0.75rem;">(none)</span>
+              </div>
+            </div>
+            <div class="queue-global-item">
+              <label>Delay</label>
+              <select id="queueDelaySelect" style="width:120px;">
+                <option value="2000">2 seconds</option>
+                <option value="3000" selected>3 seconds</option>
+                <option value="5000">5 seconds</option>
+                <option value="10000">10 seconds</option>
+              </select>
+            </div>
+            <div class="queue-global-item">
+              <label>Output</label>
+              <div class="directory-picker-inline">
+                <span class="dir-name" id="queueDirName">Not set</span>
+                <button class="btn-secondary btn-sm" onclick="selectQueueOutputDir()">Change</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="queue-modal-footer fullscreen">
+        <div class="queue-footer-stats">
+          <span id="promptBoxCount">0</span> prompts = <strong id="totalImagesCount">0</strong> images
+        </div>
+        <div class="queue-footer-actions">
+          <button class="btn-secondary" onclick="closeQueueSetup()">Cancel</button>
+          <button class="btn-primary" id="startQueueBtn" onclick="confirmAndStartQueue()" disabled>Start Batch</button>
+        </div>
       </div>
     </div>
+    <!-- Hidden file input for per-box refs -->
+    <input type="file" id="boxRefInput" class="file-hidden" accept="image/*" multiple>
   </div>
 
   <!-- JavaScript Modules -->
