@@ -84,6 +84,13 @@
 
 /* ========== DESKTOP SPLIT LAYOUT ========== */
 @media (min-width: 1024px) {
+    :root {
+        --font-size-base: 0.75rem;
+        --font-size-md: 0.8rem;
+        --font-size-lg: 0.85rem;
+        --font-size-xl: 0.9rem;
+    }
+
     .container {
         max-width: var(--container-max-width-desktop);
         padding: var(--spacing-2xl) var(--spacing-3xl);
@@ -97,13 +104,21 @@
     }
 
     .left-panel {
-        flex: 0 0 var(--left-panel-width);
-        max-width: var(--left-panel-width);
+        flex: 0 0 480px;
+        max-width: 480px;
         display: flex;
         flex-direction: column;
-        gap: var(--spacing-md);
+        gap: var(--spacing-lg);
         padding-right: 15px;
         align-self: flex-start;
+    }
+
+    textarea#prompt {
+        min-height: 140px;
+    }
+
+    .collapsible-header {
+        padding: var(--spacing-lg) var(--spacing-xl);
     }
 
     body {
@@ -176,15 +191,49 @@
 /* Extra large screens */
 @media (min-width: 1400px) {
     .container {
-        max-width: var(--container-max-width-xl);
+        max-width: 1800px;
     }
 
     .left-panel {
-        flex: 0 0 var(--left-panel-width-xl);
-        max-width: var(--left-panel-width-xl);
+        flex: 0 0 540px;
+        max-width: 540px;
     }
 
     .right-panel .image-box {
         max-height: calc(100vh - 180px);
+    }
+
+    textarea#prompt {
+        min-height: 170px;
+    }
+}
+
+/* Ultra-wide screens */
+@media (min-width: 1800px) {
+    .container {
+        max-width: var(--container-max-width-xxl);
+        padding: var(--spacing-2xl) 40px;
+    }
+
+    .left-panel {
+        flex: 0 0 var(--left-panel-width-xxl);
+        max-width: var(--left-panel-width-xxl);
+        gap: var(--spacing-xl);
+    }
+
+    .desktop-layout {
+        gap: 40px;
+    }
+
+    .right-panel .image-box {
+        max-height: calc(100vh - 160px);
+    }
+
+    .collapsible-body {
+        padding: var(--spacing-xl);
+    }
+
+    textarea#prompt {
+        min-height: 200px;
     }
 }
