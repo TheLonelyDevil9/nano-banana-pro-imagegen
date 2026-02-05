@@ -308,6 +308,25 @@
           <button class="btn-secondary" id="clearAllBtn" onclick="clearAll()" title="Clear refs, prompt & output">Clear</button>
         </div>
         <button class="btn-cancel hidden" id="cancelBtn" onclick="cancelGeneration()">Cancel Generation</button>
+
+        <!-- Batch Generate Button -->
+        <button class="btn-batch" id="batchBtn" onclick="openQueueSetup()">Batch Generate</button>
+
+        <!-- Output Folder Section -->
+        <div class="output-folder-section">
+          <div class="output-folder-header">
+            <label>Output Folder</label>
+            <span class="output-folder-status" id="outputDirStatus"></span>
+          </div>
+          <div class="output-folder-row">
+            <span class="output-folder-name" id="outputDirName">Not set</span>
+            <button class="btn-secondary btn-sm" id="selectDirBtn" onclick="selectOutputDirectory()">Select Folder</button>
+            <button class="btn-secondary btn-sm hidden" id="clearDirBtn" onclick="clearDirectorySelection()">×</button>
+          </div>
+          <div class="output-folder-hint" id="fsSupportWarning" style="display:none;">
+            File System Access not supported. Images will auto-download.
+          </div>
+        </div>
       </div>
       <!-- End Left Panel -->
 
@@ -438,6 +457,94 @@
     <button class="ref-preview-nav ref-next" id="refNextBtn" onclick="event.stopPropagation(); nextRefImage()">›</button>
     <div class="ref-preview-counter" id="refPreviewCounter">1 / 1</div>
     <div class="ref-preview-hint">Swipe or use arrow keys to navigate</div>
+  </div>
+
+  <!-- Queue Overlay -->
+  <div class="overlay" id="queueOverlay" onclick="toggleQueuePanel()"></div>
+
+  <!-- Queue Progress Panel -->
+  <div class="queue-panel" id="queuePanel">
+    <div class="queue-header">
+      <h2>Batch Queue</h2>
+      <button class="close-btn" onclick="toggleQueuePanel()">×</button>
+    </div>
+    <div class="queue-progress-section">
+      <div class="queue-progress-bar-container">
+        <div class="queue-progress-bar" id="queueProgressBar"></div>
+      </div>
+      <div class="queue-progress-stats">
+        <span id="queueProgressText">No items</span>
+      </div>
+      <div class="queue-status" id="queueStatus">Queue empty</div>
+    </div>
+    <div class="queue-controls">
+      <button class="btn-primary" id="queueStartBtn" onclick="startQueue()">▶ Start</button>
+      <button class="btn-secondary hidden" id="queuePauseBtn" onclick="pauseQueue()">⏸ Pause</button>
+      <button class="btn-secondary hidden" id="queueResumeBtn" onclick="resumeQueue()">▶ Resume</button>
+      <button class="btn-cancel" id="queueCancelBtn" onclick="cancelQueue()" disabled>⏹ Cancel</button>
+    </div>
+    <div class="queue-item-list" id="queueItemList">
+      <div class="queue-empty">No items in queue</div>
+    </div>
+    <div class="queue-actions">
+      <button class="btn-secondary" onclick="openQueueSetup()" style="flex:1;">+ Add More</button>
+      <button class="btn-secondary" onclick="clearQueue()" style="flex:1;">Clear All</button>
+    </div>
+  </div>
+
+  <!-- Queue Setup Modal -->
+  <div class="queue-modal" id="queueSetupModal">
+    <div class="queue-modal-content">
+      <div class="queue-modal-header">
+        <h3>Batch Generation Setup</h3>
+        <button class="close-btn" onclick="closeQueueSetup()">×</button>
+      </div>
+      <div class="queue-modal-body">
+        <div class="queue-section">
+          <label>Prompts <span style="color:var(--text-dim);font-size:0.65rem;">(one per line)</span></label>
+          <textarea id="queuePromptsInput" rows="6" placeholder="Enter each prompt on a new line..."></textarea>
+          <div class="queue-prompts-count">
+            <span id="promptCount">0</span> prompts
+          </div>
+        </div>
+        <div class="queue-section">
+          <label>Variations per prompt</label>
+          <div class="queue-variations-row">
+            <input type="range" id="variationsSlider" min="1" max="10" value="1">
+            <span id="variationsLabel">1</span>
+          </div>
+          <div class="queue-total">
+            Total images: <strong id="totalImagesCount">0</strong>
+          </div>
+        </div>
+        <div class="queue-section">
+          <label>Output Folder</label>
+          <div class="directory-picker">
+            <button class="btn-secondary btn-sm" onclick="selectQueueOutputDir()">📁 Select Folder</button>
+            <span class="dir-name" id="queueDirName">Not set</span>
+          </div>
+        </div>
+        <div class="queue-section">
+          <label>Delay between generations</label>
+          <select id="queueDelaySelect">
+            <option value="2000">2 seconds</option>
+            <option value="3000" selected>3 seconds</option>
+            <option value="5000">5 seconds</option>
+            <option value="10000">10 seconds</option>
+          </select>
+        </div>
+        <div class="queue-section">
+          <div class="toggle-item">
+            <input type="checkbox" id="useCurrentRefs" checked>
+            <label for="useCurrentRefs" style="text-transform:none;color:var(--text-secondary);">Use current reference images <span id="currentRefsInfo" style="color:var(--text-dim);font-size:0.65rem;">(none)</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="queue-modal-footer">
+        <button class="btn-secondary" onclick="closeQueueSetup()">Cancel</button>
+        <button class="btn-primary" id="startQueueBtn" onclick="confirmAndStartQueue()" disabled>Start Batch Generation</button>
+      </div>
+    </div>
   </div>
 
   <!-- JavaScript Modules -->

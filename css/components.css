@@ -694,3 +694,378 @@ input:checked+.slider:before {
     opacity: 0;
     pointer-events: none;
 }
+
+/* ==========================================================================
+   Batch / Queue Components
+   ========================================================================== */
+
+/* Batch Generate Button */
+.btn-batch {
+    background: linear-gradient(135deg, var(--color-iterate), #7c3aed);
+    color: var(--text-primary);
+    width: 100%;
+    font-weight: 600;
+}
+
+.btn-batch:hover {
+    background: linear-gradient(135deg, var(--color-iterate-hover), #6d28d9);
+}
+
+/* Small buttons */
+.btn-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+}
+
+/* Output Folder Section */
+.output-folder-section {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    background: var(--bg-surface);
+}
+
+.output-folder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.output-folder-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+}
+
+.output-folder-status.active {
+    background: var(--color-success);
+}
+
+.output-folder-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.output-folder-name {
+    flex: 1;
+    font-size: var(--font-size-md);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.output-folder-name.selected {
+    color: var(--color-success);
+}
+
+.output-folder-hint {
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-dim);
+}
+
+/* Queue Panel (slide-in from right) */
+.queue-panel {
+    position: fixed;
+    top: 0;
+    right: -420px;
+    width: 400px;
+    max-width: 90vw;
+    height: 100vh;
+    background: var(--bg-surface);
+    border-left: 1px solid var(--border-default);
+    z-index: var(--z-history);
+    display: flex;
+    flex-direction: column;
+    transition: right var(--transition-normal);
+}
+
+.queue-panel.open {
+    right: 0;
+}
+
+.queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xl);
+    border-bottom: 1px solid var(--border-default);
+}
+
+.queue-header h2 {
+    font-size: var(--font-size-3xl);
+    color: var(--text-primary);
+    margin: 0;
+}
+
+/* Queue Progress Section */
+.queue-progress-section {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-default);
+}
+
+.queue-progress-bar-container {
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: var(--spacing-sm);
+}
+
+.queue-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-success));
+    transition: width var(--transition-normal);
+    width: 0%;
+}
+
+.queue-progress-stats {
+    font-size: var(--font-size-md);
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.queue-status {
+    font-size: var(--font-size-lg);
+    color: var(--text-secondary);
+}
+
+/* Queue Controls */
+.queue-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-default);
+}
+
+.queue-controls button {
+    flex: 1;
+}
+
+/* Queue Item List */
+.queue-item-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+}
+
+.queue-empty {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+    font-size: var(--font-size-md);
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-xs);
+    border-left: 3px solid transparent;
+}
+
+.queue-item-pending {
+    border-left-color: var(--text-muted);
+}
+
+.queue-item-generating {
+    border-left-color: var(--color-primary);
+    background: rgba(234, 179, 8, 0.1);
+}
+
+.queue-item-completed {
+    border-left-color: var(--color-success);
+}
+
+.queue-item-failed {
+    border-left-color: var(--color-error);
+}
+
+.queue-item-cancelled {
+    border-left-color: var(--text-dim);
+    opacity: 0.6;
+}
+
+.queue-item-status {
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.queue-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.queue-item-prompt {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-item-meta {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+.queue-error-text {
+    color: var(--color-error);
+    margin-left: var(--spacing-xs);
+}
+
+.queue-item-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    font-size: 18px;
+    line-height: 1;
+}
+
+.queue-item-remove:hover {
+    color: var(--color-error);
+}
+
+/* Queue Actions */
+.queue-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--border-default);
+}
+
+/* Mini Spinner */
+.mini-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-default);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+/* Queue Setup Modal */
+.queue-modal {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-overlay-dark);
+    z-index: var(--z-preview);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xl);
+}
+
+.queue-modal.open {
+    display: flex;
+}
+
+.queue-modal-content {
+    background: var(--bg-surface);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-default);
+}
+
+.queue-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xl);
+    border-bottom: 1px solid var(--border-default);
+}
+
+.queue-modal-header h3 {
+    margin: 0;
+    font-size: var(--font-size-2xl);
+    color: var(--text-primary);
+}
+
+.queue-modal-body {
+    padding: var(--spacing-xl);
+}
+
+.queue-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+.queue-section:last-child {
+    margin-bottom: 0;
+}
+
+.queue-section label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+}
+
+.queue-section textarea {
+    width: 100%;
+    min-height: 120px;
+}
+
+.queue-prompts-count {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.queue-variations-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.queue-variations-row input[type="range"] {
+    flex: 1;
+}
+
+.queue-total {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.queue-total strong {
+    color: var(--color-primary);
+}
+
+.directory-picker {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.dir-name {
+    color: var(--text-muted);
+    font-size: var(--font-size-md);
+}
+
+.dir-name.selected {
+    color: var(--color-success);
+}
+
+.queue-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xl);
+    border-top: 1px solid var(--border-default);
+}

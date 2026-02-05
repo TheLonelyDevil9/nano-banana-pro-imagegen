@@ -3,7 +3,7 @@
  * Initialization and event setup
  */
 
-import { $, debounce, restoreCollapsibleStates, updateCharCounter, updateAspectPreview, updateThinkingLabel, openPromptEditor, updatePromptEditorCounter } from './ui.js';
+import { $, debounce, restoreCollapsibleStates, updateCharCounter, updateAspectPreview, updateThinkingLabel, openPromptEditor, updatePromptEditorCounter, showToast } from './ui.js';
 import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastModel } from './persistence.js';
 import { authMode, restoreServiceAccount, restoreAuthMode, setupAuthDragDrop } from './auth.js';
 import { refreshModels } from './models.js';
@@ -12,6 +12,9 @@ import { initDB, loadHistory, useHistoryItem } from './history.js';
 import { setupZoomHandlers, resetZoom, setCurrentImgRef } from './zoom.js';
 import { generate, loadSessionStats, setCurrentImg } from './generation.js';
 import { loadSavedPrompts, isDropdownOpen, closePromptsDropdown } from './prompts.js';
+import { isFileSystemSupported, restoreDirectoryHandle } from './filesystem.js';
+import { restoreQueueState, hasResumableQueue } from './queue.js';
+import { initQueueUI, updateDirectoryDisplay } from './queueUI.js';
 
 // Initialize application
 async function init() {
@@ -100,6 +103,32 @@ async function init() {
     await initDB();
     loadHistory();
     loadSavedPrompts();
+
+    // Initialize filesystem module
+    if (isFileSystemSupported()) {
+        const restored = await restoreDirectoryHandle();
+        if (restored === 'needs-permission') {
+            // Handle permission request on user gesture
+            console.log('Directory handle restored, needs permission on next action');
+        }
+    } else {
+        // Show warning that File System Access is not supported
+        const warningEl = $('fsSupportWarning');
+        if (warningEl) {
+            warningEl.style.display = 'block';
+        }
+    }
+
+    // Restore queue state
+    const savedQueue = restoreQueueState();
+
+    // Initialize queue UI
+    initQueueUI();
+
+    // Check for resumable queue
+    if (savedQueue && hasResumableQueue()) {
+        showToast('Previous queue found. Open Batch Queue to resume.');
+    }
 
     // Click outside to close prompts dropdown
     document.addEventListener('click', e => {
