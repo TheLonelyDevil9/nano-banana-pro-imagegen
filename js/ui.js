@@ -16,6 +16,85 @@ export function showToast(msg) {
     toastTimeout = setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
+/**
+ * Show a confirmation dialog
+ * @param {Object} options - Dialog options
+ * @param {string} options.title - Dialog title
+ * @param {string} options.message - Main message
+ * @param {string} options.warning - Warning text (optional)
+ * @param {string} options.confirmText - Confirm button text (default: 'Confirm')
+ * @param {string} options.cancelText - Cancel button text (default: 'Cancel')
+ * @param {boolean} options.danger - If true, confirm button is red (default: false)
+ * @returns {Promise<boolean>} - Resolves to true if confirmed, false if cancelled
+ */
+export function showConfirmDialog(options) {
+    return new Promise(resolve => {
+        const {
+            title = 'Confirm',
+            message,
+            warning = '',
+            confirmText = 'Confirm',
+            cancelText = 'Cancel',
+            danger = false
+        } = options;
+
+        // Create dialog overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-dialog-overlay';
+
+        const dialog = document.createElement('div');
+        dialog.className = 'confirm-dialog';
+        dialog.innerHTML = `
+            <div class="confirm-dialog-title">${title}</div>
+            <div class="confirm-dialog-message">${message}</div>
+            ${warning ? `<div class="confirm-dialog-warning">${warning}</div>` : ''}
+            <div class="confirm-dialog-actions">
+                <button class="btn-secondary confirm-dialog-cancel">${cancelText}</button>
+                <button class="${danger ? 'btn-cancel' : 'btn-primary'} confirm-dialog-confirm">${confirmText}</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        // Focus the cancel button by default (safer)
+        dialog.querySelector('.confirm-dialog-cancel').focus();
+
+        // Handle clicks
+        const cleanup = () => {
+            overlay.remove();
+        };
+
+        dialog.querySelector('.confirm-dialog-cancel').onclick = () => {
+            cleanup();
+            resolve(false);
+        };
+
+        dialog.querySelector('.confirm-dialog-confirm').onclick = () => {
+            cleanup();
+            resolve(true);
+        };
+
+        // Close on overlay click
+        overlay.onclick = (e) => {
+            if (e.target === overlay) {
+                cleanup();
+                resolve(false);
+            }
+        };
+
+        // Close on Escape
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') {
+                cleanup();
+                resolve(false);
+                document.removeEventListener('keydown', handleKeydown);
+            }
+        };
+        document.addEventListener('keydown', handleKeydown);
+    });
+}
+
 // Haptic feedback
 export function haptic(duration = 10) {
     if ($('hapticToggle')?.checked && navigator.vibrate) {
@@ -162,9 +241,27 @@ export function updatePromptEditorCounter() {
     $('promptEditorCounter').textContent = len.toLocaleString() + ' characters';
 }
 
+// Theme toggle
+export function toggleTheme() {
+    const isLight = $('lightThemeToggle')?.checked;
+    document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+}
+
+// Restore theme on load
+export function restoreTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    const toggle = $('lightThemeToggle');
+    if (toggle) {
+        toggle.checked = savedTheme === 'light';
+    }
+}
+
 // Make functions globally available for HTML onclick handlers
 window.toggleCollapsible = toggleCollapsible;
 window.toggleApiKeyVisibility = toggleApiKeyVisibility;
 window.openPromptEditor = openPromptEditor;
 window.closePromptEditor = closePromptEditor;
 window.applyPromptEditor = applyPromptEditor;
+window.toggleTheme = toggleTheme;

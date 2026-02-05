@@ -208,6 +208,11 @@ export async function generateSingleImage(prompt, config, refImagesData = [], si
         body.tools = [{ google_search: {} }];
     }
 
+    // Add safety settings if provided
+    if (config.safetySettings && config.safetySettings.length > 0) {
+        body.safetySettings = config.safetySettings;
+    }
+
     const data = await generateWithRetry(config.model, body, signal);
 
     const candidate = data.candidates?.[0];
@@ -239,8 +244,37 @@ export function getCurrentConfig() {
         thinkingBudget: el.thinkingToggle.checked
             ? parseInt(el.thinkingBudget.value)
             : 0,
-        searchEnabled: el.searchToggle.checked
+        searchEnabled: el.searchToggle.checked,
+        safetySettings: getSafetySettings()
     };
+}
+
+/**
+ * Get safety settings from UI
+ */
+function getSafetySettings() {
+    const $ = id => document.getElementById(id);
+    const settings = [];
+
+    const harassment = $('safetyHarassment')?.value;
+    const hateSpeech = $('safetyHateSpeech')?.value;
+    const sexuallyExplicit = $('safetySexuallyExplicit')?.value;
+    const dangerous = $('safetyDangerous')?.value;
+
+    if (harassment) {
+        settings.push({ category: 'HARM_CATEGORY_HARASSMENT', threshold: harassment });
+    }
+    if (hateSpeech) {
+        settings.push({ category: 'HARM_CATEGORY_HATE_SPEECH', threshold: hateSpeech });
+    }
+    if (sexuallyExplicit) {
+        settings.push({ category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: sexuallyExplicit });
+    }
+    if (dangerous) {
+        settings.push({ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: dangerous });
+    }
+
+    return settings;
 }
 
 // Main generate function - each call is a fresh start (no conversation history)

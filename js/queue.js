@@ -5,9 +5,9 @@
 
 import { DEFAULT_QUEUE_DELAY_MS, MAX_QUEUE_ITEMS, MAX_VARIATIONS_PER_PROMPT, QUEUE_STORAGE_KEY } from './config.js';
 import { generateSingleImage, getCurrentConfig } from './generation.js';
-import { saveToHistoryThumbnailOnly } from './history.js';
+import { saveToHistoryThumbnailOnly, saveQueueRefsMultiple, loadQueueRefsMultiple, deleteQueueRefsMultiple, clearAllQueueRefs } from './history.js';
 import { saveImageToFilesystem, getDirectoryInfo } from './filesystem.js';
-import { showToast, haptic, playNotificationSound } from './ui.js';
+import { showToast, haptic, playNotificationSound, showConfirmDialog } from './ui.js';
 import { refImages } from './references.js';
 
 // Queue item statuses
@@ -27,7 +27,8 @@ let queueState = {
     delayBetweenMs: DEFAULT_QUEUE_DELAY_MS,
     completedCount: 0,
     failedCount: 0,
-    startedAt: null
+    startedAt: null,
+    generationTimes: [] // Track generation times for ETA calculation
 };
 
 let abortController = null;
@@ -60,14 +61,15 @@ export function setOnProgress(callback) {
  * @param {number} variationsPerPrompt - Number of variations per prompt
  * @param {Object} config - Generation config
  * @param {Array} refImagesSnapshot - Reference images to use
+ * @param {string} batchName - Optional batch name for filename prefix
  * @returns {Object[]} - Created queue items
  */
-export function addToQueue(prompts, variationsPerPrompt, config, refImagesSnapshot = []) {
+export function addToQueue(prompts, variationsPerPrompt, config, refImagesSnapshot = [], batchName = '') {
     const newItems = [];
     const timestamp = Date.now();
 
     // Debug: log what refs we're receiving
-    console.log('[Queue] addToQueue called with', refImagesSnapshot?.length || 0, 'refs');
+    console.log('[Queue] addToQueue called with', refImagesSnapshot?.length || 0, 'refs, batchName:', batchName);
 
     prompts.forEach((prompt, promptIndex) => {
         const promptGroupId = 'pg_' + timestamp + '_' + promptIndex;
@@ -96,7 +98,8 @@ export function addToQueue(prompts, variationsPerPrompt, config, refImagesSnapsh
                 error: null,
                 filename: null,
                 config: { ...config },
-                refImages: itemRefs
+                refImages: itemRefs,
+                batchName: batchName || ''
             });
 
             console.log(`[Queue] Created item v${v + 1}/${variationsPerPrompt} with ${itemRefs.length} refs`);
@@ -104,6 +107,18 @@ export function addToQueue(prompts, variationsPerPrompt, config, refImagesSnapsh
     });
 
     queueState.items.push(...newItems);
+
+    // Save refs to IndexedDB for persistence
+    const refsToSave = newItems
+        .filter(item => item.refImages && item.refImages.length > 0)
+        .map(item => ({ itemId: item.id, refImages: item.refImages }));
+
+    if (refsToSave.length > 0) {
+        saveQueueRefsMultiple(refsToSave).catch(e => {
+            console.error('[Queue] Failed to save refs to IndexedDB:', e);
+        });
+    }
+
     persistQueueState();
     notifyProgress();
 
@@ -119,6 +134,10 @@ export function removeQueueItem(id) {
         const item = queueState.items[index];
         if (item.status === QueueStatus.PENDING) {
             queueState.items.splice(index, 1);
+            // Also remove refs from IndexedDB
+            deleteQueueRefsMultiple([id]).catch(e => {
+                console.error('[Queue] Failed to delete refs:', e);
+            });
             persistQueueState();
             notifyProgress();
         }
@@ -126,17 +145,91 @@ export function removeQueueItem(id) {
 }
 
 /**
- * Clear all queue items
+ * Skip a pending queue item
+ * Note: Refs are NOT deleted here - they're kept in IndexedDB for potential retry
  */
-export function clearQueue() {
+export function skipQueueItem(id) {
+    const item = queueState.items.find(i => i.id === id);
+    if (item && item.status === QueueStatus.PENDING) {
+        item.status = QueueStatus.CANCELLED;
+        item.error = 'Skipped by user';
+        item.completedAt = Date.now();
+        // Don't delete refs - user might want to retry later
+        persistQueueState();
+        notifyProgress();
+        showToast('Item skipped');
+    }
+}
+
+/**
+ * Retry a failed or cancelled queue item
+ * Restores refs from IndexedDB if they were lost (e.g., after page refresh)
+ */
+export async function retryQueueItem(id) {
+    const item = queueState.items.find(i => i.id === id);
+    if (item && (item.status === QueueStatus.FAILED || item.status === QueueStatus.CANCELLED)) {
+        // Restore refs from IndexedDB if missing (e.g., after page refresh)
+        if (!item.refImages || item.refImages.length === 0) {
+            try {
+                const refsMap = await loadQueueRefsMultiple([id]);
+                if (refsMap.has(id)) {
+                    item.refImages = refsMap.get(id);
+                    console.log(`[Queue] Restored ${item.refImages.length} refs for retry`);
+                }
+            } catch (e) {
+                console.error('[Queue] Failed to restore refs for retry:', e);
+            }
+        }
+
+        item.status = QueueStatus.PENDING;
+        item.error = null;
+        item.startedAt = null;
+        item.completedAt = null;
+        persistQueueState();
+        notifyProgress();
+        showToast('Item queued for retry');
+
+        // Auto-start if queue is not running
+        if (!queueState.isRunning) {
+            startQueue();
+        }
+    }
+}
+
+/**
+ * Clear all queue items (with confirmation)
+ */
+export async function clearQueue() {
+    const itemCount = queueState.items.length;
+    if (itemCount === 0) {
+        showToast('Queue is already empty');
+        return;
+    }
+
+    const confirmed = await showConfirmDialog({
+        title: 'Clear Queue',
+        message: `Clear all ${itemCount} items from the queue?`,
+        warning: 'This cannot be undone.',
+        confirmText: 'Clear All',
+        danger: true
+    });
+
+    if (!confirmed) return;
+
     if (queueState.isRunning) {
         cancelQueue();
     }
     queueState.items = [];
     queueState.completedCount = 0;
     queueState.failedCount = 0;
+    queueState.generationTimes = [];
+    // Clear all refs from IndexedDB
+    clearAllQueueRefs().catch(e => {
+        console.error('[Queue] Failed to clear refs:', e);
+    });
     persistQueueState();
     notifyProgress();
+    showToast('Queue cleared');
 }
 
 /**
@@ -256,7 +349,8 @@ async function processQueue() {
                     const saveResult = await saveImageToFilesystem(
                         result.imageData,
                         item.prompt,
-                        item.variationIndex
+                        item.variationIndex,
+                        item.batchName
                     );
                     filename = saveResult.filename;
                 } catch (e) {
@@ -279,6 +373,19 @@ async function processQueue() {
             item.completedAt = Date.now();
             item.filename = filename;
             queueState.completedCount++;
+
+            // Track generation time for ETA calculation
+            const generationTime = item.completedAt - item.startedAt;
+            queueState.generationTimes.push(generationTime);
+            // Keep only last 20 times to avoid memory bloat
+            if (queueState.generationTimes.length > 20) {
+                queueState.generationTimes.shift();
+            }
+
+            // Clean up refs from IndexedDB (no longer needed)
+            deleteQueueRefsMultiple([item.id]).catch(e => {
+                console.error('[Queue] Failed to clean up refs:', e);
+            });
 
         } catch (e) {
             if (e.name === 'AbortError') {
@@ -369,8 +476,9 @@ export function persistQueueState() {
 
 /**
  * Restore queue state from localStorage
+ * Also restores refs from IndexedDB
  */
-export function restoreQueueState() {
+export async function restoreQueueState() {
     try {
         const saved = localStorage.getItem(QUEUE_STORAGE_KEY);
         if (!saved) return null;
@@ -388,6 +496,29 @@ export function restoreQueueState() {
         // Mark as paused if was running
         if (state.isRunning) {
             state.isPaused = true;
+        }
+
+        // Restore refs from IndexedDB for all retryable items (PENDING, FAILED, CANCELLED)
+        const retryableItemIds = state.items
+            .filter(item =>
+                item.status === QueueStatus.PENDING ||
+                item.status === QueueStatus.FAILED ||
+                item.status === QueueStatus.CANCELLED
+            )
+            .map(item => item.id);
+
+        if (retryableItemIds.length > 0) {
+            try {
+                const refsMap = await loadQueueRefsMultiple(retryableItemIds);
+                state.items.forEach(item => {
+                    if (refsMap.has(item.id)) {
+                        item.refImages = refsMap.get(item.id);
+                        console.log(`[Queue] Restored ${item.refImages.length} refs for item ${item.id}`);
+                    }
+                });
+            } catch (e) {
+                console.error('[Queue] Failed to restore refs from IndexedDB:', e);
+            }
         }
 
         queueState = state;
@@ -426,6 +557,72 @@ export function getQueueStats() {
 }
 
 /**
+ * Get average generation time from recent completions
+ * @returns {number} Average time in milliseconds
+ */
+export function getAverageGenerationTime() {
+    const times = queueState.generationTimes;
+    if (times.length === 0) {
+        return 30000; // Default 30s estimate
+    }
+
+    // Use last 10 generations for rolling average
+    const recent = times.slice(-10);
+    return Math.round(recent.reduce((a, b) => a + b, 0) / recent.length);
+}
+
+/**
+ * Get estimated time remaining for queue
+ * @returns {Object} ETA info with totalMs and formatted string
+ */
+export function getQueueETA() {
+    const pending = queueState.items.filter(i => i.status === QueueStatus.PENDING).length;
+    const inProgress = queueState.items.filter(i => i.status === QueueStatus.GENERATING).length;
+
+    if (pending === 0 && inProgress === 0) {
+        return { totalMs: 0, formatted: 'Complete' };
+    }
+
+    const avgTime = getAverageGenerationTime();
+    const delayTime = queueState.delayBetweenMs;
+
+    // Calculate remaining time
+    // Current item (if generating) + pending items + delays between them
+    const remainingItems = pending + inProgress;
+    const totalMs = remainingItems * avgTime + Math.max(0, remainingItems - 1) * delayTime;
+
+    return {
+        totalMs,
+        formatted: formatDuration(totalMs),
+        avgGenerationTime: avgTime,
+        isEstimate: queueState.generationTimes.length < 3 // Less confident with few samples
+    };
+}
+
+/**
+ * Format duration in human-readable form
+ * @param {number} ms - Duration in milliseconds
+ * @returns {string} Formatted duration
+ */
+function formatDuration(ms) {
+    if (ms < 60000) {
+        const secs = Math.round(ms / 1000);
+        return `~${secs}s`;
+    }
+
+    const mins = Math.floor(ms / 60000);
+    const secs = Math.round((ms % 60000) / 1000);
+
+    if (mins < 60) {
+        return secs > 0 ? `~${mins}m ${secs}s` : `~${mins}m`;
+    }
+
+    const hours = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    return remainingMins > 0 ? `~${hours}h ${remainingMins}m` : `~${hours}h`;
+}
+
+/**
  * Utility: delay helper
  */
 function delay(ms) {
@@ -439,3 +636,5 @@ window.resumeQueue = resumeQueue;
 window.cancelQueue = cancelQueue;
 window.clearQueue = clearQueue;
 window.removeQueueItem = removeQueueItem;
+window.skipQueueItem = skipQueueItem;
+window.retryQueueItem = retryQueueItem;

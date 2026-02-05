@@ -7,6 +7,7 @@ import { $, showToast } from './ui.js';
 import {
     getQueueState,
     getQueueStats,
+    getQueueETA,
     addToQueue,
     setOnProgress,
     setQueueDelay,
@@ -55,6 +56,105 @@ export function initQueueUI() {
     updateDirectoryDisplay();
 }
 
+// Drag state
+let draggedBoxId = null;
+
+/**
+ * Setup drag-drop reordering for prompt boxes
+ */
+function setupDragReorder() {
+    const container = $('promptBoxesContainer');
+    if (!container) return;
+
+    container.addEventListener('dragstart', e => {
+        const box = e.target.closest('.prompt-box');
+        if (box) {
+            draggedBoxId = box.dataset.boxId;
+            box.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedBoxId);
+        }
+    });
+
+    container.addEventListener('dragend', e => {
+        const box = e.target.closest('.prompt-box');
+        if (box) {
+            box.classList.remove('dragging');
+            draggedBoxId = null;
+        }
+        // Remove all drop indicators
+        container.querySelectorAll('.prompt-box').forEach(b => {
+            b.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+    });
+
+    container.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        const targetBox = e.target.closest('.prompt-box');
+        if (!targetBox || targetBox.dataset.boxId === draggedBoxId) return;
+
+        // Determine if dropping above or below
+        const rect = targetBox.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const isAbove = e.clientY < midY;
+
+        // Clear previous indicators
+        container.querySelectorAll('.prompt-box').forEach(b => {
+            b.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        // Add indicator
+        targetBox.classList.add(isAbove ? 'drag-over-top' : 'drag-over-bottom');
+    });
+
+    container.addEventListener('dragleave', e => {
+        const targetBox = e.target.closest('.prompt-box');
+        if (targetBox) {
+            targetBox.classList.remove('drag-over-top', 'drag-over-bottom');
+        }
+    });
+
+    container.addEventListener('drop', e => {
+        e.preventDefault();
+        const targetBox = e.target.closest('.prompt-box');
+        if (!targetBox || !draggedBoxId) return;
+
+        const targetId = targetBox.dataset.boxId;
+        if (targetId === draggedBoxId) return;
+
+        // Determine drop position
+        const rect = targetBox.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const insertBefore = e.clientY < midY;
+
+        // Reorder promptBoxes array
+        const draggedIndex = promptBoxes.findIndex(b => b.id === draggedBoxId);
+        const targetIndex = promptBoxes.findIndex(b => b.id === targetId);
+
+        if (draggedIndex === -1 || targetIndex === -1) return;
+
+        // Remove dragged item
+        const [draggedItem] = promptBoxes.splice(draggedIndex, 1);
+
+        // Calculate new index
+        let newIndex = targetIndex;
+        if (draggedIndex < targetIndex) {
+            newIndex = insertBefore ? targetIndex - 1 : targetIndex;
+        } else {
+            newIndex = insertBefore ? targetIndex : targetIndex + 1;
+        }
+
+        // Insert at new position
+        promptBoxes.splice(newIndex, 0, draggedItem);
+
+        // Re-render
+        renderPromptBoxes();
+        showToast('Reordered');
+    });
+}
+
 /**
  * Generate unique ID for prompt box
  */
@@ -92,6 +192,29 @@ export function removePromptBox(id) {
     promptBoxes = promptBoxes.filter(box => box.id !== id);
     renderPromptBoxes();
     updateTotalCount();
+}
+
+/**
+ * Duplicate a prompt box
+ */
+export function duplicatePromptBox(id) {
+    const source = promptBoxes.find(b => b.id === id);
+    if (!source) return;
+
+    const newBox = {
+        id: generateBoxId(),
+        prompt: source.prompt,
+        variations: source.variations,
+        refImages: source.refImages ? source.refImages.map(r => ({ ...r, id: Date.now() + Math.random() })) : null
+    };
+
+    // Insert after source box
+    const sourceIndex = promptBoxes.indexOf(source);
+    promptBoxes.splice(sourceIndex + 1, 0, newBox);
+
+    renderPromptBoxes();
+    updateTotalCount();
+    showToast('Prompt duplicated');
 }
 
 /**
@@ -350,20 +473,26 @@ function renderPromptBoxes() {
         return;
     }
 
+    const needsDragSetup = !container.dataset.dragSetup;
+
     container.innerHTML = promptBoxes.map((box, index) => {
         const hasCustomRefs = box.refImages && box.refImages.length > 0;
         const isSelected = selectedBoxIds.has(box.id);
 
         return `
-            <div class="prompt-box ${isSelected ? 'selected' : ''}" data-box-id="${box.id}">
+            <div class="prompt-box ${isSelected ? 'selected' : ''}" data-box-id="${box.id}" draggable="true">
                 <div class="prompt-box-header">
+                    <div class="prompt-box-drag-handle" title="Drag to reorder">⋮⋮</div>
                     <label class="box-select-label">
                         <input type="checkbox" class="box-select-checkbox"
                             ${isSelected ? 'checked' : ''}
                             onchange="toggleBoxSelection('${box.id}', this.checked)">
                         <span class="prompt-box-title">Prompt ${index + 1}</span>
                     </label>
-                    <button class="prompt-box-remove" onclick="removePromptBox('${box.id}')" title="Remove">×</button>
+                    <div class="prompt-box-header-actions">
+                        <button class="prompt-box-action" onclick="duplicatePromptBox('${box.id}')" title="Duplicate">⧉</button>
+                        <button class="prompt-box-remove" onclick="removePromptBox('${box.id}')" title="Remove">×</button>
+                    </div>
                 </div>
                 <div class="prompt-box-body">
                     <textarea class="prompt-box-textarea"
@@ -406,6 +535,12 @@ function renderPromptBoxes() {
     }).join('');
 
     renderBulkActionsBar();
+
+    // Setup drag reorder if not already done
+    if (needsDragSetup) {
+        setupDragReorder();
+        container.dataset.dragSetup = 'true';
+    }
 }
 
 /**
@@ -460,6 +595,11 @@ export function closeQueueSetup() {
     // Reset sticky defaults and selection when closing modal
     stickyDefaults = { variations: 1, refImages: null };
     selectedBoxIds.clear();
+    // Clear batch name input
+    const batchNameInput = $('batchNameInput');
+    if (batchNameInput) {
+        batchNameInput.value = '';
+    }
 }
 
 /**
@@ -468,6 +608,7 @@ export function closeQueueSetup() {
 export function confirmAndStartQueue() {
     const delaySelect = $('queueDelaySelect');
     const useGlobalRefs = $('useGlobalRefs');
+    const batchNameInput = $('batchNameInput');
 
     // Filter to only boxes with prompts
     const validBoxes = promptBoxes.filter(box => box.prompt.trim().length > 0);
@@ -479,8 +620,9 @@ export function confirmAndStartQueue() {
 
     const delayMs = parseInt(delaySelect?.value) || DEFAULT_QUEUE_DELAY_MS;
     const shouldUseGlobalRefs = useGlobalRefs?.checked && refImages.length > 0;
+    const batchName = batchNameInput?.value?.trim() || '';
 
-    console.log(`[QueueUI] Starting batch: ${validBoxes.length} prompts, globalRefs: ${shouldUseGlobalRefs}, global ref count: ${refImages.length}`);
+    console.log(`[QueueUI] Starting batch: ${validBoxes.length} prompts, globalRefs: ${shouldUseGlobalRefs}, global ref count: ${refImages.length}, batchName: "${batchName}"`);
 
     // Get current config from main page
     const config = getCurrentConfig();
@@ -502,8 +644,8 @@ export function confirmAndStartQueue() {
             console.log(`[QueueUI] Box "${box.prompt.slice(0, 20)}..." has NO refs`);
         }
 
-        // Add to queue
-        addToQueue([box.prompt], box.variations, config, boxRefs);
+        // Add to queue with batch name
+        addToQueue([box.prompt], box.variations, config, boxRefs, batchName);
     }
 
     // Close modal
@@ -546,6 +688,7 @@ export function toggleQueuePanel(forceOpen = null) {
 export function renderQueuePanel() {
     const state = getQueueState();
     const stats = getQueueStats();
+    const eta = getQueueETA();
 
     // Update progress bar
     const progressBar = $('queueProgressBar');
@@ -562,6 +705,10 @@ export function renderQueuePanel() {
             let text = `${stats.completed}/${stats.total} completed`;
             if (stats.failed > 0) {
                 text += ` • ${stats.failed} failed`;
+            }
+            // Add ETA if queue is running and has pending items
+            if (state.isRunning && !state.isPaused && eta.totalMs > 0) {
+                text += ` • ${eta.formatted} remaining`;
             }
             progressText.textContent = text;
         }
@@ -625,9 +772,15 @@ function renderQueueItemList(items) {
                     ${item.error ? `<span class="queue-error-text">${escapeHtml(item.error)}</span>` : ''}
                 </div>
             </div>
-            ${item.status === 'pending' ? `
-                <button class="queue-item-remove" onclick="removeQueueItem('${item.id}')">×</button>
-            ` : ''}
+            <div class="queue-item-actions">
+                ${item.status === 'pending' ? `
+                    <button class="queue-item-btn skip-btn" onclick="skipQueueItem('${item.id}')" title="Skip this item">Skip</button>
+                    <button class="queue-item-remove" onclick="removeQueueItem('${item.id}')" title="Remove from queue">×</button>
+                ` : ''}
+                ${item.status === 'failed' || item.status === 'cancelled' ? `
+                    <button class="queue-item-btn retry-btn" onclick="retryQueueItem('${item.id}')" title="Retry this item">Retry</button>
+                ` : ''}
+            </div>
         </div>
     `).join('');
 }
@@ -950,6 +1103,92 @@ export async function exportBatchJson() {
 }
 
 /**
+ * Export completed queue items with prompt data
+ */
+export function exportQueueResults() {
+    const state = getQueueState();
+    const completedItems = state.items.filter(i => i.status === QueueStatus.COMPLETED);
+    const failedItems = state.items.filter(i => i.status === QueueStatus.FAILED || i.status === QueueStatus.CANCELLED);
+
+    if (completedItems.length === 0 && failedItems.length === 0) {
+        showToast('No results to export');
+        return;
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+    // Export successful items
+    if (completedItems.length > 0) {
+        const successReport = {
+            exportedAt: new Date().toISOString(),
+            batchName: completedItems[0]?.batchName || '',
+            totalItems: completedItems.length,
+            items: completedItems.map(item => ({
+                prompt: item.prompt,
+                filename: item.filename,
+                model: item.config?.model,
+                config: {
+                    ratio: item.config?.ratio,
+                    resolution: item.config?.resolution,
+                    thinkingBudget: item.config?.thinkingBudget
+                },
+                generationTimeMs: item.completedAt - item.startedAt,
+                completedAt: new Date(item.completedAt).toISOString()
+            }))
+        };
+
+        downloadJson(successReport, `batch_success_${timestamp}.json`);
+    }
+
+    // Export failed items
+    if (failedItems.length > 0) {
+        const failedReport = {
+            exportedAt: new Date().toISOString(),
+            batchName: failedItems[0]?.batchName || '',
+            failedItems: failedItems.length,
+            items: failedItems.map(item => ({
+                prompt: item.prompt,
+                error: item.error,
+                model: item.config?.model,
+                config: {
+                    ratio: item.config?.ratio,
+                    resolution: item.config?.resolution,
+                    thinkingBudget: item.config?.thinkingBudget
+                },
+                attemptedAt: item.startedAt ? new Date(item.startedAt).toISOString() : null
+            })),
+            _instructions: 'To retry these prompts, import this file using "Import File" in Batch Setup',
+            // Include prompts array for direct re-import
+            prompts: failedItems.map(item => ({
+                prompt: item.prompt,
+                variations: 1
+            }))
+        };
+
+        downloadJson(failedReport, `batch_failed_${timestamp}.json`);
+    }
+
+    const msg = [];
+    if (completedItems.length > 0) msg.push(`${completedItems.length} success`);
+    if (failedItems.length > 0) msg.push(`${failedItems.length} failed`);
+    showToast(`Exported: ${msg.join(', ')}`);
+}
+
+/**
+ * Helper to download JSON file
+ */
+function downloadJson(data, filename) {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+/**
  * Convert File to data URL
  */
 function fileToDataUrl(file) {
@@ -1066,6 +1305,7 @@ window.removeBoxRef = removeBoxRef;
 window.importBatchFolder = importBatchFolder;
 window.importBatchFile = importBatchFile;
 window.exportBatchJson = exportBatchJson;
+window.exportQueueResults = exportQueueResults;
 window.downloadBatchTemplate = downloadBatchTemplate;
 window.toggleBoxSelection = toggleBoxSelection;
 window.selectAllBoxes = selectAllBoxes;
@@ -1073,3 +1313,4 @@ window.deselectAllBoxes = deselectAllBoxes;
 window.openBulkRefPicker = openBulkRefPicker;
 window.clearSelectedBoxRefs = clearSelectedBoxRefs;
 window.handleBatchButtonClick = handleBatchButtonClick;
+window.duplicatePromptBox = duplicatePromptBox;

@@ -4,7 +4,7 @@
  */
 
 import { HISTORY_PAGE_SIZE } from './config.js';
-import { $, showToast, haptic } from './ui.js';
+import { $, showToast, haptic, showConfirmDialog } from './ui.js';
 import { setFilesystemDB, loadImageFromFilesystem, deleteFromFilesystem, getDirectoryInfo, fileExistsInFilesystem } from './filesystem.js';
 
 // History state
@@ -18,7 +18,7 @@ let currentPreviewItem = null;
 // Initialize IndexedDB
 export function initDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open('NanoBananaDB', 3);
+        const req = indexedDB.open('NanoBananaDB', 4);
         req.onerror = () => reject(req.error);
         req.onsuccess = () => {
             db = req.result;
@@ -47,6 +47,15 @@ export function initDB() {
             // Settings store (v3) - for filesystem handle persistence
             if (!database.objectStoreNames.contains('settings')) {
                 database.createObjectStore('settings', { keyPath: 'id' });
+            }
+            // Queue refs store (v4) - for persisting queue item reference images
+            if (!database.objectStoreNames.contains('queueRefs')) {
+                database.createObjectStore('queueRefs', { keyPath: 'itemId' });
+            }
+            // Reference sets store (v4) - for saving named collections of reference images
+            if (!database.objectStoreNames.contains('refSets')) {
+                const refSetsStore = database.createObjectStore('refSets', { keyPath: 'id' });
+                refSetsStore.createIndex('createdAt', 'createdAt');
             }
 
             // Migration: mark existing history items as not having filesystem files
@@ -484,11 +493,8 @@ export function downloadPreview() {
 
 // Clear all non-favorite history (also clears filesystem files)
 export async function clearHistory() {
-    if (!confirm('Clear all non-favorite history? This will also delete files from the output folder.')) return;
-
+    // First count items to delete
     const itemsToDelete = [];
-
-    // First collect all items to delete
     await new Promise((resolve) => {
         const tx = db.transaction('history', 'readonly');
         tx.objectStore('history').openCursor().onsuccess = e => {
@@ -503,6 +509,21 @@ export async function clearHistory() {
             }
         };
     });
+
+    if (itemsToDelete.length === 0) {
+        showToast('No items to clear (only favorites remain)');
+        return;
+    }
+
+    const confirmed = await showConfirmDialog({
+        title: 'Clear History',
+        message: `Delete ${itemsToDelete.length} history items?`,
+        warning: 'This will also delete files from the output folder. Favorites will be kept.',
+        confirmText: 'Clear All',
+        danger: true
+    });
+
+    if (!confirmed) return;
 
     // Delete files from filesystem
     for (const item of itemsToDelete) {
@@ -620,6 +641,230 @@ export async function syncHistoryWithFilesystem() {
     } else {
         showToast('History is in sync');
     }
+}
+
+// ============================================
+// Queue Reference Images Storage (IndexedDB)
+// ============================================
+
+/**
+ * Save reference images for a queue item to IndexedDB
+ * @param {string} itemId - Queue item ID
+ * @param {Array} refImages - Array of reference image objects
+ */
+export function saveQueueItemRefs(itemId, refImages) {
+    if (!db || !refImages || refImages.length === 0) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('queueRefs', 'readwrite');
+        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => resolve();
+        tx.objectStore('queueRefs').put({
+            itemId: itemId,
+            refImages: refImages
+        });
+    });
+}
+
+/**
+ * Save refs for multiple queue items at once
+ * @param {Array} items - Array of {itemId, refImages} objects
+ */
+export function saveQueueRefsMultiple(items) {
+    if (!db || !items || items.length === 0) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('queueRefs', 'readwrite');
+        const store = tx.objectStore('queueRefs');
+        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => resolve();
+
+        items.forEach(({ itemId, refImages }) => {
+            if (refImages && refImages.length > 0) {
+                store.put({ itemId, refImages });
+            }
+        });
+    });
+}
+
+/**
+ * Load reference images for a queue item from IndexedDB
+ * @param {string} itemId - Queue item ID
+ * @returns {Promise<Array>} - Reference images array
+ */
+export function loadQueueItemRefs(itemId) {
+    if (!db) return Promise.resolve([]);
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('queueRefs', 'readonly');
+        tx.objectStore('queueRefs').get(itemId).onsuccess = e => {
+            const result = e.target.result;
+            resolve(result ? result.refImages : []);
+        };
+        tx.onerror = () => resolve([]);
+    });
+}
+
+/**
+ * Load refs for multiple queue items at once
+ * @param {Array<string>} itemIds - Array of queue item IDs
+ * @returns {Promise<Map>} - Map of itemId -> refImages
+ */
+export function loadQueueRefsMultiple(itemIds) {
+    if (!db || !itemIds || itemIds.length === 0) return Promise.resolve(new Map());
+
+    return new Promise((resolve) => {
+        const refsMap = new Map();
+        const tx = db.transaction('queueRefs', 'readonly');
+        const store = tx.objectStore('queueRefs');
+
+        let pending = itemIds.length;
+        itemIds.forEach(itemId => {
+            store.get(itemId).onsuccess = e => {
+                const result = e.target.result;
+                if (result && result.refImages) {
+                    refsMap.set(itemId, result.refImages);
+                }
+                pending--;
+                if (pending === 0) resolve(refsMap);
+            };
+        });
+
+        tx.onerror = () => resolve(refsMap);
+    });
+}
+
+/**
+ * Delete reference images for a queue item
+ * @param {string} itemId - Queue item ID
+ */
+export function deleteQueueItemRefs(itemId) {
+    if (!db) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('queueRefs', 'readwrite');
+        tx.objectStore('queueRefs').delete(itemId);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+    });
+}
+
+/**
+ * Delete refs for multiple queue items
+ * @param {Array<string>} itemIds - Array of queue item IDs
+ */
+export function deleteQueueRefsMultiple(itemIds) {
+    if (!db || !itemIds || itemIds.length === 0) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('queueRefs', 'readwrite');
+        const store = tx.objectStore('queueRefs');
+        itemIds.forEach(id => store.delete(id));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+    });
+}
+
+/**
+ * Clear all queue refs (called when queue is cleared)
+ */
+export function clearAllQueueRefs() {
+    if (!db) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('queueRefs', 'readwrite');
+        tx.objectStore('queueRefs').clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+    });
+}
+
+// ============================================
+// Reference Sets Storage (IndexedDB)
+// ============================================
+
+/**
+ * Save a reference set
+ * @param {string} name - Set name
+ * @param {Array} images - Array of reference image objects
+ * @returns {Promise<string>} - Created set ID
+ */
+export function saveRefSet(name, images) {
+    if (!db) return Promise.reject(new Error('Database not initialized'));
+
+    return new Promise((resolve, reject) => {
+        const id = 'refset_' + Date.now();
+        const tx = db.transaction('refSets', 'readwrite');
+        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => resolve(id);
+        tx.objectStore('refSets').add({
+            id,
+            name,
+            createdAt: Date.now(),
+            images: images.map(img => ({ data: img.data }))
+        });
+    });
+}
+
+/**
+ * Load all reference sets
+ * @returns {Promise<Array>} - Array of ref sets (without image data for listing)
+ */
+export function loadRefSetsList() {
+    if (!db) return Promise.resolve([]);
+
+    return new Promise((resolve) => {
+        const sets = [];
+        const tx = db.transaction('refSets', 'readonly');
+        tx.objectStore('refSets').index('createdAt').openCursor(null, 'prev').onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+                const set = cursor.value;
+                sets.push({
+                    id: set.id,
+                    name: set.name,
+                    createdAt: set.createdAt,
+                    imageCount: set.images?.length || 0
+                });
+                cursor.continue();
+            } else {
+                resolve(sets);
+            }
+        };
+        tx.onerror = () => resolve([]);
+    });
+}
+
+/**
+ * Load a specific reference set with full image data
+ * @param {string} id - Set ID
+ * @returns {Promise<Object|null>} - Ref set with images
+ */
+export function loadRefSet(id) {
+    if (!db) return Promise.resolve(null);
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('refSets', 'readonly');
+        tx.objectStore('refSets').get(id).onsuccess = e => {
+            resolve(e.target.result || null);
+        };
+        tx.onerror = () => resolve(null);
+    });
+}
+
+/**
+ * Delete a reference set
+ * @param {string} id - Set ID
+ */
+export function deleteRefSet(id) {
+    if (!db) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('refSets', 'readwrite');
+        tx.objectStore('refSets').delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+    });
 }
 
 // Make functions globally available for HTML onclick handlers

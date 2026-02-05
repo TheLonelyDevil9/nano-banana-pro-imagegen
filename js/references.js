@@ -4,8 +4,8 @@
  */
 
 import { MAX_REF_IMAGE_SIZE, MAX_REFS } from './config.js';
-import { $, showToast } from './ui.js';
-import { getDB } from './history.js';
+import { $, showToast, showConfirmDialog } from './ui.js';
+import { getDB, saveRefSet, loadRefSetsList, loadRefSet, deleteRefSet } from './history.js';
 import { loadPersistedInput } from './persistence.js';
 
 // Reference images state
@@ -350,6 +350,152 @@ export function clearRefsQuiet() {
     saveRefImages();
 }
 
+// ============================================
+// Reference Sets Management
+// ============================================
+
+/**
+ * Save current refs as a named set
+ */
+export async function saveCurrentRefsAsSet() {
+    if (refImages.length === 0) {
+        showToast('No reference images to save');
+        return;
+    }
+
+    const name = prompt('Enter a name for this reference set:');
+    if (!name || !name.trim()) return;
+
+    try {
+        await saveRefSet(name.trim(), refImages);
+        showToast(`Saved "${name.trim()}" (${refImages.length} images)`);
+    } catch (e) {
+        console.error('Failed to save ref set:', e);
+        showToast('Failed to save reference set');
+    }
+}
+
+/**
+ * Show ref sets dropdown/modal
+ */
+export async function showRefSetsMenu() {
+    const sets = await loadRefSetsList();
+
+    if (sets.length === 0) {
+        showToast('No saved reference sets');
+        return;
+    }
+
+    // Create dropdown menu
+    const existing = $('refSetsDropdown');
+    if (existing) existing.remove();
+
+    const dropdown = document.createElement('div');
+    dropdown.id = 'refSetsDropdown';
+    dropdown.className = 'ref-sets-dropdown';
+    dropdown.innerHTML = `
+        <div class="ref-sets-header">Load Reference Set</div>
+        ${sets.map(set => `
+            <div class="ref-sets-item" data-id="${set.id}">
+                <span class="ref-sets-name">${escapeHtml(set.name)}</span>
+                <span class="ref-sets-count">${set.imageCount} imgs</span>
+                <button class="ref-sets-delete" onclick="event.stopPropagation(); deleteRefSetById('${set.id}')" title="Delete">×</button>
+            </div>
+        `).join('')}
+    `;
+
+    // Position near the load button
+    const loadBtn = $('loadRefSetBtn');
+    if (loadBtn) {
+        const rect = loadBtn.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+    }
+
+    document.body.appendChild(dropdown);
+
+    // Handle item clicks
+    dropdown.querySelectorAll('.ref-sets-item').forEach(item => {
+        item.addEventListener('click', async () => {
+            const id = item.dataset.id;
+            await loadRefSetById(id);
+            dropdown.remove();
+        });
+    });
+
+    // Close on click outside
+    const closeHandler = (e) => {
+        if (!dropdown.contains(e.target) && e.target.id !== 'loadRefSetBtn') {
+            dropdown.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 10);
+}
+
+/**
+ * Load a ref set by ID
+ */
+export async function loadRefSetById(id) {
+    try {
+        const set = await loadRefSet(id);
+        if (!set || !set.images) {
+            showToast('Reference set not found');
+            return;
+        }
+
+        // Replace current refs with set
+        refImages = set.images.map(img => ({
+            id: Date.now() + Math.random(),
+            data: img.data
+        }));
+        renderRefs();
+        saveRefImages();
+        showToast(`Loaded "${set.name}" (${set.images.length} images)`);
+    } catch (e) {
+        console.error('Failed to load ref set:', e);
+        showToast('Failed to load reference set');
+    }
+}
+
+/**
+ * Delete a ref set by ID
+ */
+export async function deleteRefSetById(id) {
+    const confirmed = await showConfirmDialog({
+        title: 'Delete Reference Set',
+        message: 'Delete this saved reference set?',
+        confirmText: 'Delete',
+        danger: true
+    });
+
+    if (!confirmed) return;
+
+    try {
+        await deleteRefSet(id);
+        showToast('Reference set deleted');
+        // Refresh dropdown if open
+        const dropdown = $('refSetsDropdown');
+        if (dropdown) {
+            dropdown.remove();
+            showRefSetsMenu();
+        }
+    } catch (e) {
+        console.error('Failed to delete ref set:', e);
+        showToast('Failed to delete reference set');
+    }
+}
+
+/**
+ * Escape HTML for safe rendering
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Make functions globally available for HTML onclick handlers
 window.addRefImages = addRefImages;
 window.removeRef = removeRef;
@@ -360,3 +506,7 @@ window.clearRefsQuiet = clearRefsQuiet;
 window.prevRefImage = prevRefImage;
 window.nextRefImage = nextRefImage;
 window.closeRefPreview = closeRefPreview;
+window.saveCurrentRefsAsSet = saveCurrentRefsAsSet;
+window.showRefSetsMenu = showRefSetsMenu;
+window.loadRefSetById = loadRefSetById;
+window.deleteRefSetById = deleteRefSetById;

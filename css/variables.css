@@ -7,7 +7,8 @@
   --color-primary: #eab308;
   --color-primary-hover: #ca9a06;
   --color-primary-dark: #444;
-  
+  --color-warning: #f59e0b;
+
   /* Colors - Semantic */
   --color-success: #22c55e;
   --color-error: #ef4444;
@@ -18,21 +19,22 @@
   --color-iterate-hover: #1e40af;
   --color-refresh: #059669;
   --color-refresh-hover: #047857;
-  
+
   /* Colors - Background */
   --bg-body: #000;
   --bg-surface: #111;
   --bg-surface-alt: #1a1a1a;
   --bg-elevated: #222;
+  --bg-hover: #2a2a2a;
   --bg-overlay: rgba(0, 0, 0, 0.7);
   --bg-overlay-dark: rgba(0, 0, 0, 0.9);
   --bg-overlay-darker: rgba(0, 0, 0, 0.98);
-  
+
   /* Colors - Border */
   --border-default: #333;
   --border-hover: #444;
   --border-focus: var(--color-primary);
-  
+
   /* Colors - Text */
   --text-primary: #fff;
   --text-secondary: #aaa;
@@ -40,7 +42,7 @@
   --text-dim: #666;
   --text-placeholder: #555;
   --text-disabled: #444;
-  
+
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -49,14 +51,14 @@
   --spacing-xl: 16px;
   --spacing-2xl: 20px;
   --spacing-3xl: 30px;
-  
+
   /* Border Radius */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
   --radius-full: 50%;
-  
+
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-size-xs: 0.6rem;
@@ -69,18 +71,18 @@
   --font-size-3xl: 1rem;
   --font-size-4xl: 1.25rem;
   --font-size-input: 16px;
-  
+
   /* Transitions */
   --transition-fast: 0.2s;
   --transition-normal: 0.3s;
-  
+
   /* Z-index */
   --z-overlay: 140;
   --z-history: 150;
   --z-preview: 200;
   --z-fullscreen: 300;
   --z-fullscreen-controls: 310;
-  
+
   /* Sizes */
   --ref-thumb-size: 70px;
   --switch-width: 44px;
@@ -94,4 +96,36 @@
   --history-panel-max-width: 400px;
   --left-panel-width-xxl: 580px;
   --container-max-width-xxl: 2200px;
+}
+
+/* ==========================================================================
+   Light Theme
+   ========================================================================== */
+
+[data-theme="light"] {
+  /* Colors - Background */
+  --bg-body: #f5f5f5;
+  --bg-surface: #ffffff;
+  --bg-surface-alt: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-hover: #f0f0f0;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+  --bg-overlay-dark: rgba(0, 0, 0, 0.7);
+  --bg-overlay-darker: rgba(0, 0, 0, 0.85);
+
+  /* Colors - Border */
+  --border-default: #e0e0e0;
+  --border-hover: #d0d0d0;
+
+  /* Colors - Text */
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #6a6a6a;
+  --text-dim: #8a8a8a;
+  --text-placeholder: #aaa;
+  --text-disabled: #ccc;
+
+  /* Adjust primary for better contrast on light */
+  --color-primary: #d4a106;
+  --color-primary-hover: #b8900a;
 }

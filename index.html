@@ -185,7 +185,11 @@
         <div class="ref-section">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <label>Reference Images <span id="refCount"></span> <span style="color:#666;font-size:0.6rem;">(max 14)</span></label>
-            <button class="btn-secondary" id="clearRefsBtn" onclick="clearRefs()" style="padding:4px 8px;font-size:0.7rem;">Clear All</button>
+            <div class="ref-actions">
+              <button class="btn-secondary btn-sm" id="loadRefSetBtn" onclick="showRefSetsMenu()" title="Load saved set">Load</button>
+              <button class="btn-secondary btn-sm" onclick="saveCurrentRefsAsSet()" title="Save current refs as set">Save</button>
+              <button class="btn-secondary btn-sm" id="clearRefsBtn" onclick="clearRefs()">Clear</button>
+            </div>
           </div>
           <input type="file" id="refInput" class="file-hidden" accept="image/*" multiple onchange="addRefImages(this.files)">
           <div class="ref-grid" id="refGrid">
@@ -298,6 +302,61 @@
             <div class="settings-row">
               <span class="settings-label">Haptic feedback</span>
               <label class="switch"><input type="checkbox" id="hapticToggle" checked><span class="slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label">Light theme</span>
+              <label class="switch"><input type="checkbox" id="lightThemeToggle" onchange="toggleTheme()"><span class="slider"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Safety Settings (Collapsible) -->
+        <div class="collapsible collapsed" id="safetyCollapsible">
+          <div class="collapsible-header" onclick="toggleCollapsible('safetyCollapsible')">
+            <label>Safety Settings</label>
+            <span class="collapsible-chevron">▼</span>
+          </div>
+          <div class="collapsible-body">
+            <div class="safety-settings-grid">
+              <div class="safety-row">
+                <span class="safety-label">Harassment</span>
+                <select id="safetyHarassment" class="safety-select">
+                  <option value="BLOCK_NONE">None</option>
+                  <option value="BLOCK_ONLY_HIGH">Low</option>
+                  <option value="BLOCK_MEDIUM_AND_ABOVE" selected>Medium</option>
+                  <option value="BLOCK_LOW_AND_ABOVE">High</option>
+                </select>
+              </div>
+              <div class="safety-row">
+                <span class="safety-label">Hate Speech</span>
+                <select id="safetyHateSpeech" class="safety-select">
+                  <option value="BLOCK_NONE">None</option>
+                  <option value="BLOCK_ONLY_HIGH">Low</option>
+                  <option value="BLOCK_MEDIUM_AND_ABOVE" selected>Medium</option>
+                  <option value="BLOCK_LOW_AND_ABOVE">High</option>
+                </select>
+              </div>
+              <div class="safety-row">
+                <span class="safety-label">Sexually Explicit</span>
+                <select id="safetySexuallyExplicit" class="safety-select">
+                  <option value="BLOCK_NONE" selected>None</option>
+                  <option value="BLOCK_ONLY_HIGH">Low</option>
+                  <option value="BLOCK_MEDIUM_AND_ABOVE">Medium</option>
+                  <option value="BLOCK_LOW_AND_ABOVE">High</option>
+                </select>
+              </div>
+              <div class="safety-row">
+                <span class="safety-label">Dangerous Content</span>
+                <select id="safetyDangerous" class="safety-select">
+                  <option value="BLOCK_NONE">None</option>
+                  <option value="BLOCK_ONLY_HIGH">Low</option>
+                  <option value="BLOCK_MEDIUM_AND_ABOVE" selected>Medium</option>
+                  <option value="BLOCK_LOW_AND_ABOVE">High</option>
+                </select>
+              </div>
+            </div>
+            <div class="safety-note">
+              None = no filtering, Low = block high probability only, Medium = default, High = strictest
             </div>
           </div>
         </div>
@@ -491,6 +550,7 @@
     </div>
     <div class="queue-actions">
       <button class="btn-secondary" onclick="openQueueSetup()" style="flex:1;">+ Add More</button>
+      <button class="btn-secondary" onclick="exportQueueResults()" style="flex:1;">Export Results</button>
       <button class="btn-secondary" onclick="clearQueue()" style="flex:1;">Clear All</button>
     </div>
   </div>
@@ -526,6 +586,10 @@
         <!-- Global Settings -->
         <div class="queue-global-settings">
           <div class="queue-global-row">
+            <div class="queue-global-item" style="flex:2;">
+              <label>Batch Name</label>
+              <input type="text" id="batchNameInput" placeholder="e.g., character-poses (optional)" maxlength="50" style="width:100%;">
+            </div>
             <div class="queue-global-item">
               <label>Default Refs</label>
               <div class="toggle-item">

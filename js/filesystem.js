@@ -174,8 +174,23 @@ export async function hasWritePermission() {
 
 /**
  * Generate a meaningful filename from prompt
+ * @param {string} prompt - The prompt text
+ * @param {number} variationIndex - Variation index (0-based)
+ * @param {string} batchName - Optional batch name prefix
  */
-export function generateFilename(prompt, variationIndex = 0) {
+export function generateFilename(prompt, variationIndex = 0, batchName = '') {
+    // Sanitize batch name if provided
+    const batchPrefix = batchName
+        ? batchName
+            .trim()
+            .toLowerCase()
+            .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 30) + '_'
+        : '';
+
     // Take first 40 chars of prompt
     const snippet = prompt
         .slice(0, 40)
@@ -195,20 +210,24 @@ export function generateFilename(prompt, variationIndex = 0) {
     // Variation suffix
     const variation = variationIndex > 0 ? `_v${variationIndex + 1}` : '';
 
-    return `${snippet}_${timestamp}${variation}.png`;
+    return `${batchPrefix}${snippet}_${timestamp}${variation}.png`;
 }
 
 /**
  * Save image to filesystem
+ * @param {string} imageDataUrl - The image data URL
+ * @param {string} prompt - The prompt text
+ * @param {number} variationIndex - Variation index (0-based)
+ * @param {string} batchName - Optional batch name prefix
  */
-export async function saveImageToFilesystem(imageDataUrl, prompt, variationIndex = 0) {
+export async function saveImageToFilesystem(imageDataUrl, prompt, variationIndex = 0, batchName = '') {
     // Fallback: trigger browser download
     if (!directoryHandle || !await hasWritePermission()) {
-        return triggerDownload(imageDataUrl, prompt, variationIndex);
+        return triggerDownload(imageDataUrl, prompt, variationIndex, batchName);
     }
 
     try {
-        const filename = generateFilename(prompt, variationIndex);
+        const filename = generateFilename(prompt, variationIndex, batchName);
         const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
 
         // Convert data URL to blob
@@ -239,15 +258,15 @@ export async function saveImageToFilesystem(imageDataUrl, prompt, variationIndex
         }
 
         // Fallback to download
-        return triggerDownload(imageDataUrl, prompt, variationIndex);
+        return triggerDownload(imageDataUrl, prompt, variationIndex, batchName);
     }
 }
 
 /**
  * Fallback: trigger browser download
  */
-function triggerDownload(imageDataUrl, prompt, variationIndex) {
-    const filename = generateFilename(prompt, variationIndex);
+function triggerDownload(imageDataUrl, prompt, variationIndex, batchName = '') {
+    const filename = generateFilename(prompt, variationIndex, batchName);
     const a = document.createElement('a');
     a.href = imageDataUrl;
     a.download = filename;
