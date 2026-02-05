@@ -7,10 +7,11 @@ import { $, showToast, haptic, playNotificationSound, updatePlaceholder, scrollT
 import { authMode, serviceAccount } from './auth.js';
 import { generateWithRetry, parseApiError } from './api.js';
 import { refImages, renderRefs } from './references.js';
-import { saveToHistory } from './history.js';
+import { saveToHistory, saveToHistoryThumbnailOnly } from './history.js';
 import { saveLastModel, persistAllInputs } from './persistence.js';
 import { resetZoom, setCurrentImgRef, getCurrentImg } from './zoom.js';
 import { MAX_REFS, MAX_CONVERSATION_TURNS } from './config.js';
+import { saveImageToFilesystem, getDirectoryInfo } from './filesystem.js';
 
 // Generation state
 let currentImg = null;
@@ -147,6 +148,91 @@ function setGenerating(on) {
     }
 }
 
+/**
+ * Generate a single image - reusable core function for both single and batch generation
+ * @param {string} prompt - The prompt text
+ * @param {Object} config - Generation configuration
+ * @param {string} config.model - Model ID
+ * @param {string} [config.ratio] - Aspect ratio
+ * @param {string} [config.resolution] - Resolution (1K/2K/4K)
+ * @param {number} [config.thinkingBudget] - Thinking budget (-1 for auto, 0 for off)
+ * @param {boolean} [config.searchEnabled] - Enable Google Search
+ * @param {Array} [refImagesData] - Reference images array [{id, data}]
+ * @param {AbortSignal} [signal] - AbortController signal
+ * @returns {Promise<string>} - Generated image as data URL
+ */
+export async function generateSingleImage(prompt, config, refImagesData = [], signal = null) {
+    // Build user message parts
+    const userParts = [];
+    refImagesData.forEach(img => {
+        const match = img.data.match(/^data:(.+);base64,(.+)$/);
+        if (match) {
+            userParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+        }
+    });
+    userParts.push({ text: prompt });
+
+    const userContent = { role: 'user', parts: userParts };
+
+    // Build generation config
+    const genConfig = { responseModalities: ['TEXT', 'IMAGE'] };
+    if (config.ratio || config.resolution) {
+        genConfig.imageConfig = {};
+        if (config.ratio) genConfig.imageConfig.aspectRatio = config.ratio;
+        if (config.resolution) genConfig.imageConfig.imageSize = config.resolution;
+    }
+
+    // Handle thinking config
+    if (config.thinkingBudget !== undefined) {
+        if (config.thinkingBudget === 0) {
+            genConfig.thinkingConfig = { thinkingBudget: 0 };
+        } else if (config.thinkingBudget > 0) {
+            genConfig.thinkingConfig = { thinkingBudget: config.thinkingBudget };
+        }
+        // -1 = auto, don't set config
+    }
+
+    const body = { contents: [userContent], generationConfig: genConfig };
+
+    if (config.searchEnabled) {
+        body.tools = [{ google_search: {} }];
+    }
+
+    const data = await generateWithRetry(config.model, body, signal);
+
+    const candidate = data.candidates?.[0];
+    const contentParts = candidate?.content?.parts;
+    const imgPart = contentParts?.find(p => p.inlineData && !p.thought);
+
+    if (!imgPart) {
+        const txtPart = contentParts?.find(p => p.text);
+        throw new Error(txtPart?.text || 'No image returned');
+    }
+
+    const imageData = 'data:' + (imgPart.inlineData.mimeType || 'image/png') + ';base64,' + imgPart.inlineData.data;
+
+    return {
+        imageData,
+        grounding: candidate?.groundingMetadata
+    };
+}
+
+/**
+ * Get current generation config from UI
+ */
+export function getCurrentConfig() {
+    const el = getCachedElements();
+    return {
+        model: el.modelSelect.value,
+        ratio: el.ratio.value,
+        resolution: el.resolution.value,
+        thinkingBudget: el.thinkingToggle.checked
+            ? parseInt(el.thinkingBudget.value)
+            : 0,
+        searchEnabled: el.searchToggle.checked
+    };
+}
+
 // Main generate function - each call is a fresh start (no conversation history)
 export async function generate() {
     const el = getCachedElements();
@@ -167,56 +253,15 @@ export async function generate() {
     showTimeEstimate();
 
     try {
-        // Build user message parts (fresh each time - no conversation history)
-        const userParts = [];
-        refImages.forEach(img => {
-            const match = img.data.match(/^data:(.+);base64,(.+)$/);
-            if (match) {
-                userParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
-            }
-        });
-        userParts.push({ text: el.prompt.value });
+        const config = getCurrentConfig();
+        const result = await generateSingleImage(
+            el.prompt.value,
+            config,
+            refImages,
+            abortController.signal
+        );
 
-        const userContent = { role: 'user', parts: userParts };
-
-        // Build config
-        const config = { responseModalities: ['TEXT', 'IMAGE'] };
-        if (el.ratio.value || el.resolution.value) {
-            config.imageConfig = {};
-            if (el.ratio.value) config.imageConfig.aspectRatio = el.ratio.value;
-            if (el.resolution.value) config.imageConfig.imageSize = el.resolution.value;
-        }
-        if (!el.thinkingToggle.checked) {
-            config.thinkingConfig = { thinkingBudget: 0 };
-        } else if (parseInt(el.thinkingBudget.value) !== -1) {
-            config.thinkingConfig = { thinkingBudget: parseInt(el.thinkingBudget.value) };
-        }
-
-        // Build request body - single turn only (fresh start each time)
-        const body = { contents: [userContent], generationConfig: config };
-
-        if (el.searchToggle.checked) body.tools = [{ google_search: {} }];
-
-        const data = await generateWithRetry(el.modelSelect.value, body, abortController.signal);
-
-        const candidate = data.candidates && data.candidates[0];
-        const contentParts = candidate && candidate.content && candidate.content.parts;
-        const imgPart = contentParts && contentParts.find(p => p.inlineData && !p.thought);
-
-        if (!imgPart) {
-            const txtPart = contentParts && contentParts.find(p => p.text);
-            const txt = txtPart && txtPart.text;
-            if (txt) {
-                el.error.innerHTML = '<strong>Text response (no image generated):</strong><br><br>' + txt.replace(/\n/g, '<br>');
-                el.error.classList.remove('hidden');
-                el.placeholder.classList.remove('hidden');
-                updatePlaceholder('No image in response');
-                return;
-            }
-            throw new Error('No image returned');
-        }
-
-        currentImg = 'data:' + (imgPart.inlineData.mimeType || 'image/png') + ';base64,' + imgPart.inlineData.data;
+        currentImg = result.imageData;
         setCurrentImgRef(currentImg);
 
         el.resultImg.src = currentImg;
@@ -228,9 +273,9 @@ export async function generate() {
         el.clearOutputBtn.disabled = false;
         resetZoom();
 
-        const grounding = candidate && candidate.groundingMetadata;
-        if (grounding && grounding.webSearchQueries && grounding.webSearchQueries.length) {
-            el.groundingInfo.innerHTML = '🔍 ' + grounding.webSearchQueries.join(', ');
+        // Handle grounding info
+        if (result.grounding?.webSearchQueries?.length) {
+            el.groundingInfo.innerHTML = '🔍 ' + result.grounding.webSearchQueries.join(', ');
             el.groundingInfo.classList.remove('hidden');
         }
 
@@ -243,7 +288,29 @@ export async function generate() {
         updateStats();
 
         saveLastModel();
-        saveToHistory(currentImg, el.prompt.value, el.modelSelect.value);
+
+        // Save to filesystem and/or history
+        const dirInfo = getDirectoryInfo();
+        if (dirInfo.isSet) {
+            // Filesystem mode: save to folder + thumbnail-only history
+            try {
+                const saveResult = await saveImageToFilesystem(currentImg, el.prompt.value, 0);
+                await saveToHistoryThumbnailOnly(currentImg, el.prompt.value, el.modelSelect.value, saveResult.filename);
+
+                if (saveResult.method === 'filesystem') {
+                    console.log('Saved to filesystem:', saveResult.filename);
+                } else {
+                    console.log('Downloaded (fallback):', saveResult.filename);
+                }
+            } catch (e) {
+                console.error('Filesystem save failed:', e);
+                // Fallback to full history save
+                saveToHistory(currentImg, el.prompt.value, el.modelSelect.value);
+            }
+        } else {
+            // Legacy mode: save full image to history
+            saveToHistory(currentImg, el.prompt.value, el.modelSelect.value);
+        }
 
         playNotificationSound();
         haptic(200);
@@ -400,4 +467,3 @@ window.download = download;
 window.copyImg = copyImg;
 window.clearOutput = clearOutput;
 window.clearAll = clearAll;
-
