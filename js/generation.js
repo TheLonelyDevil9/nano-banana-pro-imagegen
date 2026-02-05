@@ -162,15 +162,25 @@ function setGenerating(on) {
  * @returns {Promise<string>} - Generated image as data URL
  */
 export async function generateSingleImage(prompt, config, refImagesData = [], signal = null) {
+    // Debug: log incoming refs
+    console.log(`[Generation] generateSingleImage called with ${refImagesData?.length || 0} refs`);
+
     // Build user message parts
     const userParts = [];
-    refImagesData.forEach(img => {
-        const match = img.data.match(/^data:(.+);base64,(.+)$/);
-        if (match) {
-            userParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
-        }
-    });
+    if (refImagesData && refImagesData.length > 0) {
+        refImagesData.forEach((img, i) => {
+            const match = img.data?.match(/^data:(.+);base64,(.+)$/);
+            if (match) {
+                userParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                console.log(`[Generation] Added ref image ${i + 1}: ${match[1]}`);
+            } else {
+                console.warn(`[Generation] Ref image ${i + 1} has invalid data format`);
+            }
+        });
+    }
     userParts.push({ text: prompt });
+
+    console.log(`[Generation] Built ${userParts.length} parts (${userParts.length - 1} images + 1 text)`);
 
     const userContent = { role: 'user', parts: userParts };
 
@@ -291,11 +301,12 @@ export async function generate() {
 
         // Save to filesystem and/or history
         const dirInfo = getDirectoryInfo();
+        const refsUsed = refImages.length > 0 ? refImages.map(r => ({ id: r.id, data: r.data })) : null;
         if (dirInfo.isSet) {
             // Filesystem mode: save to folder + thumbnail-only history
             try {
                 const saveResult = await saveImageToFilesystem(currentImg, el.prompt.value, 0);
-                await saveToHistoryThumbnailOnly(currentImg, el.prompt.value, el.modelSelect.value, saveResult.filename);
+                await saveToHistoryThumbnailOnly(currentImg, el.prompt.value, el.modelSelect.value, saveResult.filename, refsUsed);
 
                 if (saveResult.method === 'filesystem') {
                     console.log('Saved to filesystem:', saveResult.filename);
@@ -305,11 +316,11 @@ export async function generate() {
             } catch (e) {
                 console.error('Filesystem save failed:', e);
                 // Fallback to full history save
-                saveToHistory(currentImg, el.prompt.value, el.modelSelect.value);
+                saveToHistory(currentImg, el.prompt.value, el.modelSelect.value, refsUsed);
             }
         } else {
             // Legacy mode: save full image to history
-            saveToHistory(currentImg, el.prompt.value, el.modelSelect.value);
+            saveToHistory(currentImg, el.prompt.value, el.modelSelect.value, refsUsed);
         }
 
         playNotificationSound();

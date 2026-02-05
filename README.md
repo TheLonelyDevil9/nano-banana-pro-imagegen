@@ -1,6 +1,6 @@
 # Nano Banana Pro
 
-A powerful, feature-rich Gemini image generation client that runs entirely in your browser.
+A powerful, feature-rich Gemini image generation client that runs entirely in your browser. No server, no build tools, no dependencies — just open and generate.
 
 <p align="center">
   <img src="assets/banner.jpg" alt="Nano Banana Pro" width="1200">
@@ -10,65 +10,151 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
 
 ### Authentication
 
-- **API Key** - Use your Gemini API key directly
-- **Vertex AI** - Enterprise auth with Service Account JSON (JWT signing in-browser)
-- Auto-refresh tokens & retry on auth errors
+- **API Key** — Use your Gemini API key directly
+- **Vertex AI** — Enterprise auth with Service Account JSON (JWT signing handled in-browser via jsrsasign)
+- Auto-refresh tokens with 60-second buffer before expiry
+- Auto-retry on 401/403 auth errors
+- Drag & drop service account JSON file upload
 
 ### Image Generation
 
 - All Gemini image models (gemini-2.0-flash, gemini-3-pro, imagen-3, etc.)
 - **1K / 2K / 4K** resolution options
 - 10 aspect ratios including ultrawide 21:9
-- Configurable thinking mode with budget slider
+- Configurable thinking mode with budget slider (128–24,576 tokens)
 - Google Search grounding for real-world accuracy
-- Auto-retry with exponential backoff
+- Auto-retry with exponential backoff (3 retries: 2s → 4s → 8s)
+- Generation time estimation based on model/resolution history
+- Token usage estimation per generation
 
 ### Reference Images
 
 - Up to **14 reference images** per generation
-- Auto-compression to 2560px max (saves bandwidth)
+- Auto-compression to 2560px max, JPEG at 0.85 quality (saves bandwidth)
 - Drag & drop, paste from clipboard, or click to upload
-- **Iterate** button adds output to references for refinement
+- **Iterate** button adds output to references for style refinement
+- Fullscreen preview modal with arrow navigation and swipe gestures
+- Numbered order badges on thumbnails
 - Undo clear with 5-second restore window
+
+### Batch Generation (Queue System)
+
+- **Prompt Boxes** — Individual cards for each prompt with:
+  - Large, resizable textarea for long/detailed prompts
+  - Per-prompt variation count (1–10 per prompt)
+  - Per-prompt reference images (override global refs or use global as fallback)
+- Fullscreen batch setup modal for maximum editing space
+- **Global settings**: default reference images toggle, inter-generation delay (2s–10s), output directory
+- Queue panel with live progress tracking (pending / generating / completed / failed)
+- Pause, resume, and cancel controls
+- Automatic rate-limit handling with exponential backoff (increases delay on 429 errors)
+- Queue persistence — resume interrupted batches across sessions
+- **Import** — Load prompts from a folder containing `batch.json` + `refs/` subfolder
+- **Export** — Save current prompt boxes as `batch.json` for reuse
+
+#### Batch Import Format
+
+Organize a folder like this:
+
+```
+my_batch/
+├── batch.json
+└── refs/
+    ├── character_face.png
+    ├── style_guide.png
+    └── background.png
+```
+
+`batch.json` schema:
+
+```json
+{
+  "delay": 3000,
+  "prompts": [
+    {
+      "prompt": "A detailed scene description...",
+      "variations": 2,
+      "refs": ["refs/character_face.png", "refs/style_guide.png"]
+    },
+    {
+      "prompt": "Another prompt without custom refs...",
+      "variations": 1
+    }
+  ]
+}
+```
+
+| Field | Required | Default | Description |
+| ----- | -------- | ------- | ----------- |
+| `delay` | No | 3000 | Delay between generations (ms) |
+| `prompts[].prompt` | Yes | — | The prompt text |
+| `prompts[].variations` | No | 1 | Number of variations to generate |
+| `prompts[].refs` | No | — | Relative paths to reference images in the folder |
+
+### Filesystem Output
+
+- **Direct file saving** to a user-selected output folder via the File System Access API
+- Auto-generated filenames: `YYYYMMDD_HHMMSS_prompt-snippet.png`
+- Persistent directory handle — remembers your output folder across sessions
+- Fallback to browser download when filesystem access is unavailable
+- Works for both single generations and batch queue
+- Delete files directly from history
 
 ### History & Favorites
 
-- Persistent storage via IndexedDB
-- Thumbnail generation for fast browsing
-- Favorites system with filtering
-- Load prompts from history
+- Persistent storage via IndexedDB (database v3 with migration support)
+- **Two storage modes**:
+  - Full image storage (when no output folder is set)
+  - Thumbnail-only storage (when output folder is set — full image loaded on demand)
+- Favorites system with star toggle and filtering (all / favorites)
+- Load prompts and images from history into the current session
+- Infinite scroll pagination (15 items per page)
 - Clear all (preserves favorites)
+- Delete individual items (also removes from filesystem if applicable)
 
 ### Image Viewing
 
-- Pinch-to-zoom (mobile) / Mouse wheel (desktop)
-- Pan when zoomed
-- Fullscreen modal with zoom controls
-- Download & copy to clipboard
+- **Fullscreen modal** with dedicated zoom controls
+- Pinch-to-zoom (mobile) / Mouse wheel zoom (desktop)
+- Pan when zoomed in (touch drag or mouse drag)
+- Double-tap / double-click to toggle zoom
+- Zoom level indicator (auto-hides)
+- Zoom range: 1x–10x (fullscreen)
+- Download and copy to clipboard
 
-### Mobile Optimized
+### Saved Prompts
 
-- Pinch-to-zoom on images
-- Double-tap to zoom/reset
-- Haptic feedback
-- Touch-friendly UI
-- Fullscreen prompt editor for comfortable typing
+- Save frequently-used prompts to IndexedDB
+- Quick-access dropdown from the prompt toolbar
+- Duplicate detection prevents saving the same prompt twice
+- Load saved prompts into the textarea with one click
+- Delete individual saved prompts
 
 ### Prompt Editor
 
-- **Fullscreen mode** - Click expand button or press `Ctrl+Shift+F`
-- Character counter
+- **Fullscreen mode** — Click the expand button or press `Ctrl+Shift+F`
+- Character counter with live updates
 - Works on all platforms (desktop & mobile)
+- Content syncs back to the main textarea on close
+
+### Mobile Optimized
+
+- Pinch-to-zoom on images with smooth interpolation
+- Double-tap to zoom/reset
+- Swipe navigation for reference image preview
+- Haptic feedback (respects user toggle)
+- Touch-friendly UI with appropriate hit targets
+- Fullscreen prompt editor for comfortable typing on small screens
 
 ## Quick Start
 
 ### Option 1: One-Click Launchers
 
-**Windows** - Double-click `start-hidden.vbs` to run the server in the background (no terminal window)
+**Windows** — Double-click `start-hidden.vbs` to run the server in the background (no terminal window)
 
-**Termux/Android** - Run `bash start-termux.sh` to start the server in the background
+**Termux/Android** — Run `bash start-termux.sh` to start the server in the background
 
-**Standard** - Double-click `start.bat` (Windows) or run `./start.sh` (Linux/Mac)
+**Standard** — Double-click `start.bat` (Windows) or run `./start.sh` (Linux/Mac)
 
 ### Option 2: Manual Start
 
@@ -103,40 +189,73 @@ Fork this repo and enable GitHub Pages in Settings → Pages → Deploy from `ma
 ### Vertex AI (Enterprise)
 
 1. Create a Service Account in Google Cloud Console
-2. Grant it `Vertex AI User` role
+2. Grant it the `Vertex AI User` role
 3. Download the JSON key file
-4. Drop the file in the app
+4. Drop the file onto the Vertex AI auth section in the app
 
 ## Project Structure
 
 ```
 nano-banana-pro/
-├── index.html          # Entry point
-├── start.bat           # Windows launcher (with terminal)
-├── start.sh            # Linux/Mac launcher
-├── start-hidden.vbs    # Windows launcher (no terminal)
-├── start-termux.sh     # Termux/Android launcher
+├── index.html            # Single-page application entry point
+├── package.json          # Project metadata
+├── start.bat             # Windows launcher (with terminal)
+├── start.sh              # Linux/Mac launcher
+├── start-hidden.vbs      # Windows launcher (no terminal)
+├── start-termux.sh       # Termux/Android launcher
+├── assets/
+│   └── banner.jpg        # Promotional banner
 ├── css/
-│   ├── variables.css   # Design tokens (colors, spacing)
-│   ├── base.css        # Reset, typography
-│   ├── components.css  # Buttons, inputs, toggles
-│   ├── layout.css      # Container, responsive grid
-│   ├── modals.css      # Fullscreen, history, preview, prompt editor
-│   └── utilities.css   # Animations, helpers
-├── js/
-│   ├── app.js          # Entry point & initialization
-│   ├── config.js       # Constants
-│   ├── auth.js         # API key & Vertex AI auth
-│   ├── api.js          # API calls with retry logic
-│   ├── models.js       # Model loading
-│   ├── generation.js   # Image generation orchestration
-│   ├── references.js   # Reference image handling
-│   ├── history.js      # IndexedDB operations
-│   ├── zoom.js         # Pinch-to-zoom controls
-│   ├── ui.js           # Toast, haptics, DOM helpers, prompt editor
-│   ├── persistence.js  # LocalStorage management
-│   └── prompts.js      # Saved prompts management
-└── assets/             # Banner image
+│   ├── main.css          # CSS entry point (imports all modules)
+│   ├── variables.css     # Design tokens (colors, spacing, z-index)
+│   ├── base.css          # CSS reset, typography, dark theme
+│   ├── components.css    # Buttons, inputs, toggles, prompt boxes, queue
+│   ├── layout.css        # Container, responsive grid, desktop panels
+│   ├── modals.css        # Fullscreen, history, preview, prompt editor, queue
+│   └── utilities.css     # Animations, helpers, visibility classes
+└── js/
+    ├── app.js            # Entry point & initialization
+    ├── config.js         # Constants & configuration
+    ├── auth.js           # API key & Vertex AI authentication
+    ├── api.js            # API calls with retry logic
+    ├── models.js         # Model loading & caching
+    ├── generation.js     # Image generation orchestration & stats
+    ├── references.js     # Reference image handling & compression
+    ├── history.js        # IndexedDB operations & history UI
+    ├── zoom.js           # Pinch-to-zoom, mouse wheel, pan controls
+    ├── ui.js             # Toast, haptics, DOM helpers, prompt editor
+    ├── persistence.js    # localStorage management for inputs
+    ├── prompts.js        # Saved prompts management
+    ├── filesystem.js     # File System Access API operations
+    ├── queue.js          # Batch generation queue engine
+    └── queueUI.js        # Batch setup UI, prompt boxes, import/export
+```
+
+## Module Architecture
+
+The application is organized as ES modules with clear separation of concerns:
+
+```
+app.js (entry point)
+├── ui.js ─────────────── DOM helpers, toast, haptics, prompt editor
+├── persistence.js ────── localStorage save/restore for all inputs
+├── auth.js ───────────── Authentication (API key + Vertex AI JWT)
+│   └── config.js
+├── models.js ─────────── Model list fetching with 5-min cache
+│   └── auth.js
+├── generation.js ─────── Core generation, stats, download, copy
+│   ├── api.js ────────── API calls with retry + error parsing
+│   ├── references.js ─── Reference image state + compression
+│   ├── history.js ────── IndexedDB CRUD + history UI
+│   └── filesystem.js ─── File System Access API operations
+├── zoom.js ───────────── Fullscreen zoom (pinch, wheel, pan)
+├── prompts.js ────────── Saved prompts CRUD + dropdown UI
+├── queue.js ──────────── Queue engine (add, process, pause, resume)
+│   └── generation.js
+└── queueUI.js ────────── Prompt boxes, batch setup modal, import/export
+    ├── queue.js
+    ├── references.js
+    └── filesystem.js
 ```
 
 ## Keyboard Shortcuts
@@ -145,41 +264,76 @@ nano-banana-pro/
 |----------|--------|
 | `Ctrl+Enter` | Generate image |
 | `Ctrl+Shift+F` | Open fullscreen prompt editor |
-| `Escape` | Close fullscreen/modals |
-| `+` / `-` / `0` | Zoom in/out/reset (in fullscreen) |
+| `Escape` | Close fullscreen / modals |
+| `+` / `-` / `0` | Zoom in / out / reset (in fullscreen) |
+| `←` / `→` | Navigate reference images (in preview) |
 
 ## Data Storage
 
-All data stays in your browser:
+All data stays in your browser — nothing is sent to any server except the Gemini/Vertex API for generation.
 
 | Type | Storage | Contents |
 |------|---------|----------|
-| Credentials | localStorage | API key, service account JSON |
-| Settings | localStorage | UI preferences, last model |
-| Reference Images | localStorage | Base64 compressed images |
-| Generated Images | IndexedDB | Full images + thumbnails |
-| Session Stats | sessionStorage | Generation count |
+| Credentials | localStorage | API key, project ID, vertex location, service account JSON |
+| UI Settings | localStorage | Auth mode, last model, collapsible states, toggles |
+| Input State | localStorage | Prompt text, aspect ratio, resolution, thinking budget |
+| Reference Images | IndexedDB | Compressed base64 images (migrated from localStorage) |
+| Generated Images | IndexedDB | Full images or thumbnails (depends on filesystem mode) |
+| Saved Prompts | IndexedDB | User-saved prompt library |
+| Directory Handle | IndexedDB | Output folder handle for filesystem access |
+| Queue State | localStorage | Pending/completed queue items for session recovery |
+| Session Stats | sessionStorage | Generation count, token estimates (cleared on tab close) |
+| Generation Stats | localStorage | Average generation times per model/resolution |
 
-**Nothing is sent to any server except the Gemini/Vertex API for generation.**
+## Configuration Constants
+
+| Constant | Value | Description |
+| -------- | ----- | ----------- |
+| `MAX_REFS` | 14 | Maximum reference images per generation |
+| `MAX_REF_IMAGE_SIZE` | 2560px | Compression target (longest edge) |
+| `MAX_RETRIES` | 3 | API retry attempts before failing |
+| `RETRY_DELAYS` | 2s, 4s, 8s | Exponential backoff delays |
+| `MAX_QUEUE_ITEMS` | 100 | Maximum items in batch queue |
+| `MAX_VARIATIONS_PER_PROMPT` | 10 | Maximum variations per prompt box |
+| `DEFAULT_QUEUE_DELAY_MS` | 3000 | Default delay between batch generations |
+| `HISTORY_PAGE_SIZE` | 15 | Items per infinite scroll page |
+| `MAX_CONVERSATION_TURNS` | 10 | Max conversation turns for generation |
+| `FS_MAX_ZOOM` | 10x | Maximum zoom level in fullscreen |
 
 ## Browser Support
 
-| Browser | Minimum Version |
-|---------|-----------------|
-| Chrome | 90+ |
-| Firefox | 90+ |
-| Edge | 90+ |
-| Safari | 15+ |
+| Browser | Minimum Version | File System Access |
+| ------- | --------------- | ----------------- |
+| Chrome | 90+ | Full support |
+| Edge | 90+ | Full support |
+| Firefox | 90+ | Download fallback only |
+| Safari | 15+ | Download fallback only |
+
+> **Note**: The File System Access API (direct folder output) is only available in Chromium-based browsers. Other browsers fall back to standard browser downloads.
 
 ## Development
 
-No build tools required! Edit files directly and refresh.
+No build tools required. Edit files directly and refresh.
 
 ```bash
-# Watch for changes (optional)
+# Start with auto-reload (optional)
 npx serve --reload
+
+# Or use any static file server
+python -m http.server 3000
 ```
+
+### Adding a New Module
+
+1. Create the file in `js/`
+2. Export functions and import dependencies
+3. Import and initialize in `app.js`
+4. Expose any onclick-handler functions via `window.*`
+
+### CSS Architecture
+
+CSS uses custom properties (design tokens) defined in `variables.css`. All colors, spacing, font sizes, border radii, and z-index values are tokenized for consistency.
 
 ## License
 
-MIT License - do whatever you want with it!
+MIT License — do whatever you want with it.

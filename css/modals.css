@@ -150,6 +150,12 @@
 .history-actions {
     padding: var(--spacing-lg);
     border-top: 1px solid var(--border-default);
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.history-actions button {
+    flex: 1;
 }
 
 /* Delete button for history items */
@@ -202,6 +208,31 @@
 
 .favorite-btn.active {
     color: var(--color-error);
+}
+
+/* Quick-use prompt button on history items */
+.quick-use-btn {
+    position: absolute;
+    bottom: 24px;
+    right: var(--spacing-xs);
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    z-index: 5;
+    line-height: 1;
+}
+
+.quick-use-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.history-item:hover .quick-use-btn {
+    opacity: 1;
 }
 
 /* Fullscreen Modal */

@@ -394,7 +394,8 @@
       <div class="history-empty">No images yet</div>
     </div>
     <div class="history-actions">
-      <button class="btn-secondary" onclick="clearHistory()" style="width:100%;">Clear All (keeps ★)</button>
+      <button class="btn-secondary" onclick="syncHistoryWithFilesystem()" title="Remove entries for deleted files">Sync</button>
+      <button class="btn-secondary" onclick="clearHistory()">Clear All (keeps ★)</button>
     </div>
   </div>
   
@@ -422,7 +423,9 @@
       <img class="preview-img" id="previewImg" src="" alt="Preview">
       <div class="preview-prompt" id="previewPrompt"></div>
       <div class="preview-actions">
-        <button class="btn-primary" onclick="useHistoryItem()">Use Prompt & Image</button>
+        <button class="btn-primary" onclick="useHistoryItem()">Use All</button>
+        <button class="btn-secondary" onclick="useHistoryPromptOnly()">Use Prompt</button>
+        <button class="btn-secondary" onclick="useHistoryRefs()" id="useRefsBtn" disabled>Use Refs</button>
         <button class="btn-secondary" onclick="downloadPreview()">Download</button>
         <button class="btn-secondary" onclick="closePreview()">Close</button>
       </div>
@@ -498,12 +501,20 @@
       <div class="queue-modal-header">
         <h3>Batch Generation Setup</h3>
         <div class="queue-modal-header-actions">
-          <button class="btn-secondary btn-sm" onclick="importBatchFolder()" title="Import from folder">Import</button>
+          <button class="btn-secondary btn-sm" onclick="selectAllBoxes()" title="Select all prompts for bulk actions">Select All</button>
+          <button class="btn-secondary btn-sm" onclick="downloadBatchTemplate()" title="Download batch.json template">Template</button>
+          <button class="btn-secondary btn-sm" onclick="importBatchFile()" title="Import JSON file (prompts only)">Import File</button>
+          <button class="btn-secondary btn-sm" onclick="importBatchFolder()" title="Import folder with batch.json + refs">Import Folder</button>
           <button class="btn-secondary btn-sm" onclick="exportBatchJson()" title="Export prompts">Export</button>
           <button class="close-btn" onclick="closeQueueSetup()">×</button>
         </div>
       </div>
       <div class="queue-modal-body fullscreen">
+        <!-- Bulk Actions Bar (shown when prompts are selected) -->
+        <div class="bulk-actions-bar" id="bulkActionsBar">
+          <!-- Populated by JS when prompts are selected -->
+        </div>
+
         <!-- Prompt Boxes Container -->
         <div class="prompt-boxes-container" id="promptBoxesContainer">
           <!-- Prompt boxes rendered dynamically by JS -->

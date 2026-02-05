@@ -66,6 +66,9 @@ export function addToQueue(prompts, variationsPerPrompt, config, refImagesSnapsh
     const newItems = [];
     const timestamp = Date.now();
 
+    // Debug: log what refs we're receiving
+    console.log('[Queue] addToQueue called with', refImagesSnapshot?.length || 0, 'refs');
+
     prompts.forEach((prompt, promptIndex) => {
         const promptGroupId = 'pg_' + timestamp + '_' + promptIndex;
 
@@ -74,6 +77,11 @@ export function addToQueue(prompts, variationsPerPrompt, config, refImagesSnapsh
                 showToast(`Queue limit reached (${MAX_QUEUE_ITEMS})`);
                 break;
             }
+
+            // Create a copy of refs for each variation to avoid shared reference issues
+            const itemRefs = refImagesSnapshot && refImagesSnapshot.length > 0
+                ? refImagesSnapshot.map(r => ({ ...r }))
+                : [];
 
             newItems.push({
                 id: generateId(),
@@ -88,8 +96,10 @@ export function addToQueue(prompts, variationsPerPrompt, config, refImagesSnapsh
                 error: null,
                 filename: null,
                 config: { ...config },
-                refImages: refImagesSnapshot
+                refImages: itemRefs
             });
+
+            console.log(`[Queue] Created item v${v + 1}/${variationsPerPrompt} with ${itemRefs.length} refs`);
         }
     });
 
@@ -217,6 +227,10 @@ async function processQueue() {
             break;
         }
 
+        // Debug: log refs for this item
+        console.log(`[Queue] Processing item ${item.id}, variation ${item.variationIndex + 1}/${item.totalVariations}`);
+        console.log(`[Queue] Item has ${item.refImages?.length || 0} refs`);
+
         // Process this item
         item.status = QueueStatus.GENERATING;
         item.startedAt = Date.now();
@@ -225,6 +239,7 @@ async function processQueue() {
 
         try {
             // Generate image
+            console.log(`[Queue] Calling generateSingleImage with ${item.refImages?.length || 0} refs`);
             const result = await generateSingleImage(
                 item.prompt,
                 item.config,
@@ -250,11 +265,13 @@ async function processQueue() {
             }
 
             // Save to history (thumbnail only)
+            const refsUsed = item.refImages && item.refImages.length > 0 ? item.refImages : null;
             await saveToHistoryThumbnailOnly(
                 result.imageData,
                 item.prompt,
                 item.config.model,
-                filename
+                filename,
+                refsUsed
             );
 
             // Mark completed

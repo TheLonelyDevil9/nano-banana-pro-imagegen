@@ -306,6 +306,44 @@ export async function deleteFromFilesystem(filename) {
 }
 
 /**
+ * Check if a file exists in the filesystem
+ */
+export async function fileExistsInFilesystem(filename) {
+    if (!directoryHandle || !filename) {
+        return false;
+    }
+
+    try {
+        await directoryHandle.getFileHandle(filename);
+        return true;
+    } catch (e) {
+        // NotFoundError means file doesn't exist
+        return false;
+    }
+}
+
+/**
+ * Get list of all image files in the directory
+ */
+export async function listFilesInDirectory() {
+    if (!directoryHandle || !await hasWritePermission()) {
+        return [];
+    }
+
+    const files = [];
+    try {
+        for await (const entry of directoryHandle.values()) {
+            if (entry.kind === 'file' && entry.name.match(/\.(png|jpg|jpeg|webp|gif)$/i)) {
+                files.push(entry.name);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to list directory:', e);
+    }
+    return files;
+}
+
+/**
  * Update directory UI elements
  */
 function updateDirectoryUI() {

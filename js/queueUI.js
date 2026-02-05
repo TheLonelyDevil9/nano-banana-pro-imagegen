@@ -20,6 +20,16 @@ import { MAX_REFS, DEFAULT_QUEUE_DELAY_MS } from './config.js';
 // Prompt boxes state
 let promptBoxes = [];
 let currentBoxForRefs = null;
+let bulkRefMode = false;  // When true, file input adds to selected boxes
+
+// Multi-select state
+let selectedBoxIds = new Set();
+
+// Sticky defaults - remember last prompt box settings for new boxes
+let stickyDefaults = {
+    variations: 1,
+    refImages: null  // null = use global, [...] = custom refs
+};
 
 /**
  * Initialize queue UI
@@ -48,13 +58,15 @@ function generateBoxId() {
 
 /**
  * Add a new prompt box
+ * When called with no explicit variations/refs, uses sticky defaults from last box
  */
-export function addPromptBox(prompt = '', variations = 1, boxRefImages = null) {
+export function addPromptBox(prompt = '', variations = null, boxRefImages = undefined) {
     const box = {
         id: generateBoxId(),
         prompt: prompt,
-        variations: variations,
-        refImages: boxRefImages  // null = use global refs
+        variations: variations !== null ? variations : stickyDefaults.variations,
+        refImages: boxRefImages !== undefined ? boxRefImages :
+            (stickyDefaults.refImages ? stickyDefaults.refImages.map(r => ({ ...r, id: Date.now() + Math.random() })) : null)
     };
     promptBoxes.push(box);
     renderPromptBoxes();
@@ -91,7 +103,9 @@ export function updatePromptBox(id, updates) {
  * Set variations for a prompt box
  */
 export function setBoxVariations(id, variations) {
-    updatePromptBox(id, { variations: parseInt(variations) || 1 });
+    const v = parseInt(variations) || 1;
+    updatePromptBox(id, { variations: v });
+    stickyDefaults.variations = v;
     // Re-render just the variation buttons
     const footer = document.querySelector(`[data-box-id="${id}"] .prompt-box-footer`);
     if (footer) {
@@ -122,34 +136,70 @@ export function openBoxRefPicker(boxId) {
  */
 async function handleBoxRefInput(e) {
     const files = e.target.files;
-    if (!files || files.length === 0 || !currentBoxForRefs) return;
+    if (!files || files.length === 0) return;
 
-    const box = promptBoxes.find(b => b.id === currentBoxForRefs);
-    if (!box) return;
-
-    // Initialize refImages array if null
-    if (!box.refImages) {
-        box.refImages = [];
+    // Determine which boxes to add refs to
+    let targetBoxIds = [];
+    if (bulkRefMode && selectedBoxIds.size > 0) {
+        targetBoxIds = [...selectedBoxIds];
+        bulkRefMode = false;
+    } else if (currentBoxForRefs) {
+        targetBoxIds = [currentBoxForRefs];
+    } else {
+        return;
     }
 
+    // Process files first
+    const newRefs = [];
     for (const file of files) {
-        if (box.refImages.length >= MAX_REFS) {
-            showToast(`Maximum ${MAX_REFS} reference images per prompt`);
-            break;
-        }
         if (!file.type.startsWith('image/')) continue;
-
         try {
             const dataUrl = await fileToDataUrl(file);
             const compressed = await compressImage(dataUrl);
-            box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
+            newRefs.push({ data: compressed });
         } catch (err) {
             console.error('Error processing file:', err);
         }
     }
 
+    if (newRefs.length === 0) {
+        currentBoxForRefs = null;
+        return;
+    }
+
+    // Add refs to each target box
+    for (const boxId of targetBoxIds) {
+        const box = promptBoxes.find(b => b.id === boxId);
+        if (!box) continue;
+
+        // Initialize refImages array if null
+        if (!box.refImages) {
+            box.refImages = [];
+        }
+
+        for (const ref of newRefs) {
+            if (box.refImages.length >= MAX_REFS) {
+                break;
+            }
+            // Each box gets its own copy with unique ID
+            box.refImages.push({ id: Date.now() + Math.random(), data: ref.data });
+        }
+    }
+
+    // Update sticky defaults if single box mode
+    if (targetBoxIds.length === 1) {
+        const box = promptBoxes.find(b => b.id === targetBoxIds[0]);
+        if (box && box.refImages && box.refImages.length > 0) {
+            stickyDefaults.refImages = box.refImages.map(r => ({ ...r }));
+        }
+    }
+
     renderPromptBoxes();
     currentBoxForRefs = null;
+
+    if (targetBoxIds.length > 1) {
+        showToast(`Added ${newRefs.length} ref(s) to ${targetBoxIds.length} prompts`);
+    }
 }
 
 /**
@@ -157,6 +207,7 @@ async function handleBoxRefInput(e) {
  */
 export function clearBoxRefs(id) {
     updatePromptBox(id, { refImages: null });
+    stickyDefaults.refImages = null;
     renderPromptBoxes();
 }
 
@@ -172,6 +223,90 @@ export function removeBoxRef(boxId, refId) {
         }
         renderPromptBoxes();
     }
+}
+
+/**
+ * Toggle box selection for bulk operations
+ */
+export function toggleBoxSelection(boxId, isSelected) {
+    if (isSelected) {
+        selectedBoxIds.add(boxId);
+    } else {
+        selectedBoxIds.delete(boxId);
+    }
+    renderBulkActionsBar();
+    // Update checkbox visually without full re-render
+    const checkbox = document.querySelector(`[data-box-id="${boxId}"] .box-select-checkbox`);
+    if (checkbox) {
+        checkbox.checked = isSelected;
+    }
+}
+
+/**
+ * Select all prompt boxes
+ */
+export function selectAllBoxes() {
+    promptBoxes.forEach(box => selectedBoxIds.add(box.id));
+    renderPromptBoxes();
+    renderBulkActionsBar();
+}
+
+/**
+ * Deselect all prompt boxes
+ */
+export function deselectAllBoxes() {
+    selectedBoxIds.clear();
+    renderPromptBoxes();
+    renderBulkActionsBar();
+}
+
+/**
+ * Open file picker for bulk ref add (add to all selected boxes)
+ */
+export function openBulkRefPicker() {
+    if (selectedBoxIds.size === 0) {
+        showToast('Select prompts first');
+        return;
+    }
+    bulkRefMode = true;
+    const input = $('boxRefInput');
+    if (input) {
+        input.value = '';
+        input.click();
+    }
+}
+
+/**
+ * Render bulk actions bar
+ */
+function renderBulkActionsBar() {
+    const container = $('bulkActionsBar');
+    if (!container) return;
+
+    const count = selectedBoxIds.size;
+    if (count === 0) {
+        container.classList.remove('visible');
+        return;
+    }
+
+    container.classList.add('visible');
+    container.innerHTML = `
+        <span class="bulk-selection-count">${count} selected</span>
+        <button class="btn-secondary btn-sm" onclick="openBulkRefPicker()">Add Refs to Selected</button>
+        <button class="btn-secondary btn-sm" onclick="clearSelectedBoxRefs()">Clear Refs from Selected</button>
+        <button class="btn-secondary btn-sm" onclick="deselectAllBoxes()">Deselect All</button>
+    `;
+}
+
+/**
+ * Clear refs from all selected boxes
+ */
+export function clearSelectedBoxRefs() {
+    selectedBoxIds.forEach(id => {
+        updatePromptBox(id, { refImages: null });
+    });
+    renderPromptBoxes();
+    showToast(`Cleared refs from ${selectedBoxIds.size} prompts`);
 }
 
 /**
@@ -205,16 +340,23 @@ function renderPromptBoxes() {
 
     if (promptBoxes.length === 0) {
         container.innerHTML = '';
+        renderBulkActionsBar();
         return;
     }
 
     container.innerHTML = promptBoxes.map((box, index) => {
         const hasCustomRefs = box.refImages && box.refImages.length > 0;
+        const isSelected = selectedBoxIds.has(box.id);
 
         return `
-            <div class="prompt-box" data-box-id="${box.id}">
+            <div class="prompt-box ${isSelected ? 'selected' : ''}" data-box-id="${box.id}">
                 <div class="prompt-box-header">
-                    <span class="prompt-box-title">Prompt ${index + 1}</span>
+                    <label class="box-select-label">
+                        <input type="checkbox" class="box-select-checkbox"
+                            ${isSelected ? 'checked' : ''}
+                            onchange="toggleBoxSelection('${box.id}', this.checked)">
+                        <span class="prompt-box-title">Prompt ${index + 1}</span>
+                    </label>
                     <button class="prompt-box-remove" onclick="removePromptBox('${box.id}')" title="Remove">×</button>
                 </div>
                 <div class="prompt-box-body">
@@ -256,6 +398,8 @@ function renderPromptBoxes() {
             </div>
         `;
     }).join('');
+
+    renderBulkActionsBar();
 }
 
 /**
@@ -307,6 +451,9 @@ export function closeQueueSetup() {
     if (modal) {
         modal.classList.remove('open');
     }
+    // Reset sticky defaults and selection when closing modal
+    stickyDefaults = { variations: 1, refImages: null };
+    selectedBoxIds.clear();
 }
 
 /**
@@ -327,6 +474,8 @@ export function confirmAndStartQueue() {
     const delayMs = parseInt(delaySelect?.value) || DEFAULT_QUEUE_DELAY_MS;
     const shouldUseGlobalRefs = useGlobalRefs?.checked && refImages.length > 0;
 
+    console.log(`[QueueUI] Starting batch: ${validBoxes.length} prompts, globalRefs: ${shouldUseGlobalRefs}, global ref count: ${refImages.length}`);
+
     // Get current config from main page
     const config = getCurrentConfig();
 
@@ -339,8 +488,12 @@ export function confirmAndStartQueue() {
         let boxRefs = [];
         if (box.refImages && box.refImages.length > 0) {
             boxRefs = [...box.refImages];
+            console.log(`[QueueUI] Box "${box.prompt.slice(0, 20)}..." has ${box.refImages.length} custom refs`);
         } else if (shouldUseGlobalRefs) {
             boxRefs = [...refImages];
+            console.log(`[QueueUI] Box "${box.prompt.slice(0, 20)}..." using ${refImages.length} global refs`);
+        } else {
+            console.log(`[QueueUI] Box "${box.prompt.slice(0, 20)}..." has NO refs`);
         }
 
         // Add to queue
@@ -533,13 +686,8 @@ export async function selectQueueOutputDir() {
 }
 
 /**
- * Import batch from folder
- * Expected structure:
- *   folder/
- *     batch.json
- *     refs/
- *       image1.png
- *       image2.jpg
+ * Import batch from folder (expects batch.json + refs/ subfolder)
+ * This is the folder-based import for structured batch folders
  */
 export async function importBatchFolder() {
     try {
@@ -555,68 +703,7 @@ export async function importBatchFolder() {
         }
 
         const jsonFile = await jsonHandle.getFile();
-        const jsonText = await jsonFile.text();
-        const batch = JSON.parse(jsonText);
-
-        if (!batch.prompts || !Array.isArray(batch.prompts)) {
-            showToast('Invalid batch.json format');
-            return;
-        }
-
-        // Clear existing prompt boxes
-        promptBoxes = [];
-
-        // Process each prompt
-        for (const item of batch.prompts) {
-            if (!item.prompt) continue;
-
-            const box = {
-                id: generateBoxId(),
-                prompt: item.prompt,
-                variations: item.variations || 1,
-                refImages: null
-            };
-
-            // Load refs if specified
-            if (item.refs && Array.isArray(item.refs) && item.refs.length > 0) {
-                box.refImages = [];
-                for (const refPath of item.refs) {
-                    try {
-                        // Handle nested paths (e.g., "refs/image.png")
-                        const pathParts = refPath.split('/');
-                        let fileHandle = dirHandle;
-
-                        for (let i = 0; i < pathParts.length - 1; i++) {
-                            fileHandle = await fileHandle.getDirectoryHandle(pathParts[i]);
-                        }
-                        fileHandle = await fileHandle.getFileHandle(pathParts[pathParts.length - 1]);
-
-                        const file = await fileHandle.getFile();
-                        const dataUrl = await fileToDataUrl(file);
-                        const compressed = await compressImage(dataUrl);
-                        box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
-                    } catch (err) {
-                        console.warn('Could not load ref:', refPath, err);
-                    }
-                }
-                if (box.refImages.length === 0) {
-                    box.refImages = null;
-                }
-            }
-
-            promptBoxes.push(box);
-        }
-
-        // Set delay if specified
-        if (batch.delay && $('queueDelaySelect')) {
-            $('queueDelaySelect').value = batch.delay.toString();
-        }
-
-        renderPromptBoxes();
-        updateTotalCount();
-
-        const totalImages = promptBoxes.reduce((sum, b) => sum + b.variations, 0);
-        showToast(`Imported ${promptBoxes.length} prompts (${totalImages} images)`);
+        await processBatchJson(jsonFile, dirHandle);
 
     } catch (err) {
         if (err.name !== 'AbortError') {
@@ -624,6 +711,102 @@ export async function importBatchFolder() {
             showToast('Import failed: ' + err.message);
         }
     }
+}
+
+/**
+ * Import batch from JSON file directly (prompts only, no refs from file paths)
+ * This is the file-based import for simple JSON files
+ */
+export async function importBatchFile() {
+    try {
+        const [fileHandle] = await window.showOpenFilePicker({
+            types: [{
+                description: 'JSON Files',
+                accept: { 'application/json': ['.json'] }
+            }],
+            multiple: false
+        });
+
+        const file = await fileHandle.getFile();
+        await processBatchJson(file, null);
+
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error('Import error:', err);
+            showToast('Import failed: ' + err.message);
+        }
+    }
+}
+
+/**
+ * Process batch JSON file
+ * @param {File} jsonFile - The JSON file to process
+ * @param {FileSystemDirectoryHandle|null} dirHandle - Optional directory handle for loading refs
+ */
+async function processBatchJson(jsonFile, dirHandle) {
+    const jsonText = await jsonFile.text();
+    const batch = JSON.parse(jsonText);
+
+    if (!batch.prompts || !Array.isArray(batch.prompts)) {
+        showToast('Invalid batch.json format');
+        return;
+    }
+
+    // Clear existing prompt boxes
+    promptBoxes = [];
+
+    // Process each prompt
+    for (const item of batch.prompts) {
+        if (!item.prompt) continue;
+
+        const box = {
+            id: generateBoxId(),
+            prompt: item.prompt,
+            variations: item.variations || 1,
+            refImages: null
+        };
+
+        // Load refs if specified AND we have a directory handle
+        if (item.refs && Array.isArray(item.refs) && item.refs.length > 0 && dirHandle) {
+            box.refImages = [];
+            for (const refPath of item.refs) {
+                try {
+                    // Handle nested paths (e.g., "refs/image.png")
+                    const pathParts = refPath.split('/');
+                    let fileHandle = dirHandle;
+
+                    for (let i = 0; i < pathParts.length - 1; i++) {
+                        fileHandle = await fileHandle.getDirectoryHandle(pathParts[i]);
+                    }
+                    fileHandle = await fileHandle.getFileHandle(pathParts[pathParts.length - 1]);
+
+                    const file = await fileHandle.getFile();
+                    const dataUrl = await fileToDataUrl(file);
+                    const compressed = await compressImage(dataUrl);
+                    box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
+                } catch (err) {
+                    console.warn('Could not load ref:', refPath, err);
+                }
+            }
+            if (box.refImages.length === 0) {
+                box.refImages = null;
+            }
+        }
+
+        promptBoxes.push(box);
+    }
+
+    // Set delay if specified
+    if (batch.delay && $('queueDelaySelect')) {
+        $('queueDelaySelect').value = batch.delay.toString();
+    }
+
+    renderPromptBoxes();
+    updateTotalCount();
+
+    const totalImages = promptBoxes.reduce((sum, b) => sum + b.variations, 0);
+    const refsNote = dirHandle ? '' : ' (refs ignored - use Import Folder for refs)';
+    showToast(`Imported ${promptBoxes.length} prompts (${totalImages} images)${refsNote}`);
 }
 
 /**
@@ -684,6 +867,38 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+/**
+ * Download a sample batch.json template
+ */
+export function downloadBatchTemplate() {
+    const template = {
+        _comment: 'Batch import template for Nano Banana Pro',
+        _instructions: 'Place this file in a folder with a refs/ subfolder containing your reference images',
+        delay: 3000,
+        prompts: [
+            {
+                prompt: 'Your first prompt goes here...',
+                variations: 2,
+                refs: ['refs/example1.png', 'refs/example2.png']
+            },
+            {
+                prompt: 'Second prompt (no custom refs - uses global)',
+                variations: 1
+            }
+        ]
+    };
+
+    const jsonStr = JSON.stringify(template, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'batch-template.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Template downloaded');
+}
+
 // Make functions globally available
 window.openQueueSetup = openQueueSetup;
 window.closeQueueSetup = closeQueueSetup;
@@ -698,4 +913,11 @@ window.openBoxRefPicker = openBoxRefPicker;
 window.clearBoxRefs = clearBoxRefs;
 window.removeBoxRef = removeBoxRef;
 window.importBatchFolder = importBatchFolder;
+window.importBatchFile = importBatchFile;
 window.exportBatchJson = exportBatchJson;
+window.downloadBatchTemplate = downloadBatchTemplate;
+window.toggleBoxSelection = toggleBoxSelection;
+window.selectAllBoxes = selectAllBoxes;
+window.deselectAllBoxes = deselectAllBoxes;
+window.openBulkRefPicker = openBulkRefPicker;
+window.clearSelectedBoxRefs = clearSelectedBoxRefs;

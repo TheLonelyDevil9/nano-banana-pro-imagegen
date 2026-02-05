@@ -5,7 +5,7 @@
 
 import { HISTORY_PAGE_SIZE } from './config.js';
 import { $, showToast, haptic } from './ui.js';
-import { setFilesystemDB, loadImageFromFilesystem, deleteFromFilesystem, getDirectoryInfo } from './filesystem.js';
+import { setFilesystemDB, loadImageFromFilesystem, deleteFromFilesystem, getDirectoryInfo, fileExistsInFilesystem } from './filesystem.js';
 
 // History state
 let db = null;
@@ -99,7 +99,7 @@ export function getDB() {
 }
 
 // Save image to history with thumbnail (LEGACY - stores full image)
-export function saveToHistory(imageData, promptText, model) {
+export function saveToHistory(imageData, promptText, model, refImagesUsed = null) {
     if (!db) {
         console.error('saveToHistory: Database not initialized');
         return;
@@ -129,7 +129,8 @@ export function saveToHistory(imageData, promptText, model) {
                 isFavorite: false,
                 hasFileSystemFile: false,
                 filename: null,
-                resolution: { width: img.naturalWidth, height: img.naturalHeight }
+                resolution: { width: img.naturalWidth, height: img.naturalHeight },
+                refImages: refImagesUsed
             });
             tx.oncomplete = () => {
                 console.log('Image saved to history');
@@ -144,7 +145,7 @@ export function saveToHistory(imageData, promptText, model) {
 }
 
 // Save to history with thumbnail only (for filesystem mode)
-export function saveToHistoryThumbnailOnly(imageData, promptText, model, filename) {
+export function saveToHistoryThumbnailOnly(imageData, promptText, model, filename, refImagesUsed = null) {
     if (!db) {
         console.error('saveToHistoryThumbnailOnly: Database not initialized');
         return Promise.reject(new Error('Database not initialized'));
@@ -179,7 +180,8 @@ export function saveToHistoryThumbnailOnly(imageData, promptText, model, filenam
                     isFavorite: false,
                     hasFileSystemFile: !!filename,
                     filename: filename,
-                    resolution: { width: img.naturalWidth, height: img.naturalHeight }
+                    resolution: { width: img.naturalWidth, height: img.naturalHeight },
+                    refImages: refImagesUsed
                 });
                 tx.oncomplete = () => {
                     console.log('Thumbnail saved to history (filesystem mode)');
@@ -207,6 +209,7 @@ export function loadHistory(append = false) {
     const tx = db.transaction('history', 'readonly');
     const items = [];
 
+    // Load ALL items (thumbnails only, so memory-efficient)
     tx.objectStore('history').index('timestamp').openCursor(null, 'prev').onsuccess = e => {
         const cursor = e.target.result;
         if (cursor) {
@@ -216,11 +219,9 @@ export function loadHistory(append = false) {
                 return;
             }
             items.push(item);
-            if (items.length < HISTORY_PAGE_SIZE * 3) {
-                cursor.continue();
-            }
-        }
-        if (!cursor || items.length >= HISTORY_PAGE_SIZE * 3) {
+            cursor.continue();
+        } else {
+            // Cursor exhausted - all items loaded
             allHistoryItems = items;
             renderHistoryItems(append);
             isLoadingHistory = false;
@@ -303,6 +304,18 @@ function createHistoryItemElement(item) {
     div.appendChild(favBtn);
     div.appendChild(img);
     div.appendChild(info);
+
+    // Quick action: use prompt only (no modal needed)
+    const usePromptBtn = document.createElement('button');
+    usePromptBtn.className = 'quick-use-btn';
+    usePromptBtn.textContent = '\u{1F4DD}';
+    usePromptBtn.title = 'Use prompt only';
+    usePromptBtn.onclick = (e) => {
+        e.stopPropagation();
+        $('prompt').value = item.prompt;
+        showToast('Prompt loaded');
+    };
+    div.appendChild(usePromptBtn);
 
     return div;
 }
@@ -421,6 +434,14 @@ export async function loadHistoryItem(id) {
 
     // Update currentPreviewItem with the loaded image for use/download
     currentPreviewItem.loadedImageData = imageSource;
+
+    // Update refs button state
+    const useRefsBtn = $('useRefsBtn');
+    if (useRefsBtn) {
+        const hasRefs = item.refImages && item.refImages.length > 0;
+        useRefsBtn.disabled = !hasRefs;
+        useRefsBtn.textContent = hasRefs ? `Use Refs (${item.refImages.length})` : 'Use Refs';
+    }
 }
 
 // Close preview modal
@@ -517,6 +538,90 @@ export function getCurrentPreviewItem() {
     return currentPreviewItem;
 }
 
+// Use only the prompt from history (don't change image/refs)
+export function useHistoryPromptOnly() {
+    if (!currentPreviewItem) return;
+    $('prompt').value = currentPreviewItem.prompt;
+    closePreview();
+    toggleHistory();
+    showToast('Prompt loaded');
+}
+
+// Use the reference images from this history item
+export function useHistoryRefs() {
+    if (!currentPreviewItem || !currentPreviewItem.refImages || currentPreviewItem.refImages.length === 0) return;
+
+    import('./references.js').then(refModule => {
+        refModule.setRefImages(currentPreviewItem.refImages.map(r => ({ ...r })));
+        refModule.renderRefs();
+        refModule.saveRefImages();
+        closePreview();
+        toggleHistory();
+        showToast(currentPreviewItem.refImages.length + ' reference images loaded');
+    });
+}
+
+// Sync history with filesystem - remove entries for files that no longer exist
+// Favorites are ALWAYS protected and never removed by sync
+export async function syncHistoryWithFilesystem() {
+    const dirInfo = getDirectoryInfo();
+    if (!dirInfo.isSet) {
+        showToast('No output folder selected');
+        return;
+    }
+
+    showToast('Syncing...');
+
+    // Get all history items with filesystem files (excluding favorites)
+    const itemsToCheck = await new Promise((resolve) => {
+        const items = [];
+        const tx = db.transaction('history', 'readonly');
+        tx.objectStore('history').openCursor().onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+                const item = cursor.value;
+                // Only check non-favorited items with filesystem files
+                if (item.hasFileSystemFile && item.filename && !item.isFavorite) {
+                    items.push(item);
+                }
+                cursor.continue();
+            } else {
+                resolve(items);
+            }
+        };
+    });
+
+    // Check each item's file existence
+    let removedCount = 0;
+    let skippedFavorites = 0;
+    for (const item of itemsToCheck) {
+        const exists = await fileExistsInFilesystem(item.filename);
+        if (!exists) {
+            // Double-check it's not favorited (safety)
+            if (item.isFavorite) {
+                skippedFavorites++;
+                continue;
+            }
+            // Delete this history entry
+            await new Promise((resolve) => {
+                const tx = db.transaction('history', 'readwrite');
+                tx.objectStore('history').delete(item.id);
+                tx.oncomplete = resolve;
+                tx.onerror = resolve;
+            });
+            removedCount++;
+        }
+    }
+
+    loadHistory();
+
+    if (removedCount > 0) {
+        showToast(`Removed ${removedCount} orphaned entries (favorites protected)`);
+    } else {
+        showToast('History is in sync');
+    }
+}
+
 // Make functions globally available for HTML onclick handlers
 window.toggleHistory = toggleHistory;
 window.setHistoryFilter = setHistoryFilter;
@@ -526,3 +631,6 @@ window.loadHistoryItem = loadHistoryItem;
 window.closePreview = closePreview;
 window.downloadPreview = downloadPreview;
 window.clearHistory = clearHistory;
+window.useHistoryPromptOnly = useHistoryPromptOnly;
+window.useHistoryRefs = useHistoryRefs;
+window.syncHistoryWithFilesystem = syncHistoryWithFilesystem;
