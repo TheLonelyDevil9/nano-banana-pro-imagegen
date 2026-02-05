@@ -4,7 +4,7 @@
  */
 
 import { $, debounce, restoreCollapsibleStates, updateCharCounter, updateAspectPreview, updateThinkingLabel, openPromptEditor, closePromptEditor, updatePromptEditorCounter, showToast, restoreTheme } from './ui.js';
-import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastModel } from './persistence.js';
+import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastModel, saveSettings } from './persistence.js';
 import { authMode, restoreServiceAccount, restoreAuthMode, setupAuthDragDrop } from './auth.js';
 import { refreshModels } from './models.js';
 import { renderRefs, loadRefImages, setupRefDragDrop, setupClipboardPaste, setupRefPreviewSwipe } from './references.js';
@@ -101,6 +101,9 @@ async function init() {
     window.useHistoryItem = () => {
         useHistoryItem(setCurrentImg, resetZoom);
     };
+
+    // Make saveSettings globally available
+    window.saveSettings = saveSettings;
 
     // Initialize database and load history
     await initDB();

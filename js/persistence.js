@@ -3,7 +3,7 @@
  * LocalStorage save/restore for inputs and settings
  */
 
-import { $, debounce, updateThinkingLabel } from './ui.js';
+import { $, debounce, updateThinkingLabel, showToast } from './ui.js';
 
 // Re-export for other modules
 export { debounce };
@@ -44,6 +44,11 @@ export function persistAllInputs() {
     persistInput('thinkingBudget', $('thinkingBudget').value);
     persistInput('soundToggle', $('soundToggle')?.checked);
     persistInput('hapticToggle', $('hapticToggle')?.checked);
+    // Safety settings
+    persistInput('safetyHarassment', $('safetyHarassment')?.value);
+    persistInput('safetyHateSpeech', $('safetyHateSpeech')?.value);
+    persistInput('safetySexuallyExplicit', $('safetySexuallyExplicit')?.value);
+    persistInput('safetyDangerous', $('safetyDangerous')?.value);
     // authMode and refImages are persisted by their respective modules
 }
 
@@ -61,6 +66,18 @@ export function restoreAllInputs() {
     if ($('soundToggle')) $('soundToggle').checked = savedSound;
     if ($('hapticToggle')) $('hapticToggle').checked = savedHaptic;
 
+    // Safety settings
+    const safetyDefaults = {
+        safetyHarassment: 'BLOCK_MEDIUM_AND_ABOVE',
+        safetyHateSpeech: 'BLOCK_MEDIUM_AND_ABOVE',
+        safetySexuallyExplicit: 'BLOCK_NONE',
+        safetyDangerous: 'BLOCK_MEDIUM_AND_ABOVE'
+    };
+    Object.entries(safetyDefaults).forEach(([id, defaultVal]) => {
+        const el = $(id);
+        if (el) el.value = loadPersistedInput(id, defaultVal);
+    });
+
     updateThinkingLabel();
     $('thinkingRow').style.display = $('thinkingToggle').checked ? 'block' : 'none';
 }
@@ -76,6 +93,9 @@ export function setupInputPersistence() {
     $('thinkingBudget').addEventListener('input', persist);
     $('soundToggle')?.addEventListener('change', persist);
     $('hapticToggle')?.addEventListener('change', persist);
+    // Safety settings
+    ['safetyHarassment', 'safetyHateSpeech', 'safetySexuallyExplicit', 'safetyDangerous']
+        .forEach(id => $(id)?.addEventListener('change', persist));
 }
 
 // Save last used model
@@ -108,4 +128,10 @@ export function updateThinkingNote() {
         const isProModel = model.includes('gemini-3-pro') || model.includes('nano-banana-pro');
         note.style.display = isProModel ? 'block' : 'none';
     }
+}
+
+// Manual save settings (for user reassurance)
+export function saveSettings() {
+    persistAllInputs();
+    showToast('Settings saved!');
 }

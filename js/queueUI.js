@@ -667,6 +667,7 @@ export function confirmAndStartQueue() {
 export function toggleQueuePanel(forceOpen = null) {
     const panel = $('queuePanel');
     const overlay = $('queueOverlay');
+    const fab = $('queueFab');
 
     if (!panel) return;
 
@@ -675,6 +676,11 @@ export function toggleQueuePanel(forceOpen = null) {
     panel.classList.toggle('open', shouldOpen);
     if (overlay) {
         overlay.classList.toggle('open', shouldOpen);
+    }
+
+    // Hide FAB when panel is open to avoid overlap
+    if (fab) {
+        fab.classList.toggle('hidden', shouldOpen);
     }
 
     if (shouldOpen) {

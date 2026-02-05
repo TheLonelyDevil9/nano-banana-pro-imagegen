@@ -540,17 +540,20 @@ export function hasResumableQueue() {
  * Get queue statistics
  */
 export function getQueueStats() {
-    const total = queueState.items.length;
-    const pending = queueState.items.filter(i => i.status === QueueStatus.PENDING).length;
-    const completed = queueState.completedCount;
-    const failed = queueState.failedCount;
-    const inProgress = queueState.items.filter(i => i.status === QueueStatus.GENERATING).length;
+    const items = queueState.items;
+    const total = items.length;
+    const pending = items.filter(i => i.status === QueueStatus.PENDING).length;
+    const completed = items.filter(i => i.status === QueueStatus.COMPLETED).length;
+    const failed = items.filter(i => i.status === QueueStatus.FAILED).length;
+    const cancelled = items.filter(i => i.status === QueueStatus.CANCELLED).length;
+    const inProgress = items.filter(i => i.status === QueueStatus.GENERATING).length;
 
     return {
         total,
         pending,
         completed,
         failed,
+        cancelled,
         inProgress,
         percentComplete: total > 0 ? Math.round((completed / total) * 100) : 0
     };
