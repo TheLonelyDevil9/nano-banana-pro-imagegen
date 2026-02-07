@@ -6,15 +6,7 @@ cd "$(dirname "$0")"
 echo "Starting Nano Banana Pro..."
 echo ""
 
-# Find a free port starting from 3000
-PORT=3000
-while netstat -tuln 2>/dev/null | grep -q ":$PORT " || ss -tuln 2>/dev/null | grep -q ":$PORT "; do
-    PORT=$((PORT + 1))
-    if [ $PORT -gt 3100 ]; then
-        PORT=3000
-        break
-    fi
-done
+PORT=4648
 
 echo "Server will run at http://localhost:$PORT"
 echo "Press Ctrl+C to stop"

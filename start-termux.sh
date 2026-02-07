@@ -7,15 +7,7 @@
 
 cd "$(dirname "$0")"
 
-# Find a free port starting from 3000
-PORT=3000
-while ss -tuln 2>/dev/null | grep -q ":$PORT "; do
-    PORT=$((PORT + 1))
-    if [ $PORT -gt 3100 ]; then
-        PORT=3000
-        break
-    fi
-done
+PORT=4648
 
 # Kill any existing server on port we're about to use
 pkill -f "serve -l $PORT" 2>/dev/null

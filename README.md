@@ -164,12 +164,12 @@ git clone https://github.com/yourusername/nano-banana-pro.git
 cd nano-banana-pro
 
 # Start local server
-npx serve -l 3000
+npx serve -l 4648
 # or
-python -m http.server 3000
+python -m http.server 4648
 ```
 
-Then open <http://localhost:3000>
+Then open <http://localhost:4648>
 
 ### Option 3: GitHub Pages
 
@@ -320,7 +320,7 @@ No build tools required. Edit files directly and refresh.
 npx serve --reload
 
 # Or use any static file server
-python -m http.server 3000
+python -m http.server 4648
 ```
 
 ### Adding a New Module

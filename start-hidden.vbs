@@ -11,10 +11,7 @@ scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 ' Change to the script directory
 WshShell.CurrentDirectory = scriptDir
 
-' Find a free port using PowerShell
-Set exec = WshShell.Exec("powershell -NoProfile -Command ""$ports = 3000..3100; foreach ($p in $ports) { $used = netstat -an | Select-String \"":$p \""; if (-not $used) { Write-Output $p; break } }""")
-port = Trim(exec.StdOut.ReadLine())
-If port = "" Then port = "3000"
+port = "4648"
 
 ' Start the server in a hidden PowerShell window
 WshShell.Run "powershell -WindowStyle Hidden -Command ""npx -y serve -l " & port & """", 0, False
