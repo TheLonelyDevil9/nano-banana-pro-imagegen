@@ -107,7 +107,7 @@
     overflow-y: auto;
     padding: var(--spacing-lg);
     display: grid;
-    grid-template-columns: repeat(var(--history-columns, 3), 1fr);
+    grid-template-columns: repeat(var(--history-columns, 2), 1fr);
     gap: var(--spacing-sm);
     align-content: start;
     scrollbar-width: thin;
@@ -143,8 +143,9 @@
 
 .history-item img {
     width: 100%;
-    aspect-ratio: 1;
+    aspect-ratio: auto;
     object-fit: cover;
+    display: block;
 }
 
 .history-item-info {

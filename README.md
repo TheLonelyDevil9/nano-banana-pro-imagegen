@@ -108,7 +108,7 @@ my_batch/
   - Thumbnail-only storage (when output folder is set — full image loaded on demand)
 - Favorites system with star toggle and filtering (all / favorites)
 - Load prompts and images from history into the current session
-- **Adjustable thumbnail size** — slider control (2–5 columns) with persistent preference
+- **Adjustable thumbnail size** — slider control (1–5 columns) with persistent preference
 - Infinite scroll pagination with auto-fill (loads pages until the panel overflows)
 - "Load More" fallback button when scroll detection doesn't trigger
 - Clear all (preserves favorites)
@@ -299,7 +299,7 @@ All data stays in your browser — nothing is sent to any server except the Gemi
 | `MAX_QUEUE_ITEMS` | 100 | Maximum items in batch queue |
 | `MAX_VARIATIONS_PER_PROMPT` | 10 | Maximum variations per prompt box |
 | `DEFAULT_QUEUE_DELAY_MS` | 3000 | Default delay between batch generations |
-| `HISTORY_PAGE_SIZE` | 48 | Items per infinite scroll page |
+| `HISTORY_PAGE_SIZE` | 20 | Items per infinite scroll page |
 | `MAX_CONVERSATION_TURNS` | 10 | Max conversation turns for generation |
 | `FS_MAX_ZOOM` | 10x | Maximum zoom level in fullscreen |
 

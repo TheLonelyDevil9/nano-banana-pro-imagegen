@@ -13,7 +13,7 @@ export const MAX_REF_IMAGE_SIZE = 2560;
 export const MAX_REFS = 14;
 
 // History Configuration
-export const HISTORY_PAGE_SIZE = 48;
+export const HISTORY_PAGE_SIZE = 20;
 
 // Queue Configuration
 export const DEFAULT_QUEUE_DELAY_MS = 3000;
