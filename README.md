@@ -311,7 +311,7 @@ All data stays in your browser — nothing is sent to any server except the Gemi
 | **Sent to Gemini API** | base64 `inlineData` with original mimeType | Up to 14 images per request |
 | **API response** | Typically PNG | Whatever mimeType Gemini returns (usually `image/png`) |
 | **Filesystem output** | PNG | Named `YYYYMMDD_HHMMSS_prompt-snippet.png` |
-| **History thumbnails** | PNG data URL in IndexedDB | Max 150px longest dimension |
+| **History thumbnails** | JPEG data URL in IndexedDB | Max 400px longest dimension, 0.85 quality |
 | **History full images** | On disk (filesystem mode) or data URL in IndexedDB (legacy) | Full resolution |
 
 ## Browser Support

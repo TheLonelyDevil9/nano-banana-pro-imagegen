@@ -107,6 +107,9 @@ export function getDB() {
     return db;
 }
 
+// Thumbnail max dimension — 400px keeps grid tiles sharp at all column counts
+const THUMBNAIL_MAX_SIZE = 400;
+
 // Save image to history with thumbnail (LEGACY - stores full image)
 export function saveToHistory(imageData, promptText, model, refImagesUsed = null) {
     if (!db) {
@@ -118,13 +121,12 @@ export function saveToHistory(imageData, promptText, model, refImagesUsed = null
     img.onload = () => {
         try {
             const canvas = document.createElement('canvas');
-            const maxSize = 150;
-            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+            const ratio = Math.min(THUMBNAIL_MAX_SIZE / img.width, THUMBNAIL_MAX_SIZE / img.height);
             canvas.width = img.width * ratio;
             canvas.height = img.height * ratio;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const thumbnail = canvas.toDataURL('image/png');
+            const thumbnail = canvas.toDataURL('image/jpeg', 0.85);
 
             const tx = db.transaction('history', 'readwrite');
             tx.onerror = (e) => console.error('saveToHistory transaction error:', e);
@@ -166,13 +168,12 @@ export function saveToHistoryThumbnailOnly(imageData, promptText, model, filenam
             try {
                 // Generate thumbnail
                 const canvas = document.createElement('canvas');
-                const maxSize = 150;
-                const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+                const ratio = Math.min(THUMBNAIL_MAX_SIZE / img.width, THUMBNAIL_MAX_SIZE / img.height);
                 canvas.width = img.width * ratio;
                 canvas.height = img.height * ratio;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                const thumbnail = canvas.toDataURL('image/png');
+                const thumbnail = canvas.toDataURL('image/jpeg', 0.85);
 
                 const tx = db.transaction('history', 'readwrite');
                 tx.onerror = (e) => {
@@ -346,6 +347,13 @@ function createHistoryItemElement(item) {
     const img = document.createElement('img');
     img.src = item.thumbnail || item.imageData;
     img.loading = 'lazy';
+
+    // For filesystem-backed items with old tiny thumbnails, lazy-load the full image
+    if (item.hasFileSystemFile && item.filename) {
+        loadImageFromFilesystem(item.filename).then(fullSrc => {
+            if (fullSrc) img.src = fullSrc;
+        }).catch(() => { /* keep thumbnail */ });
+    }
 
     const info = document.createElement('div');
     info.className = 'history-item-info';
