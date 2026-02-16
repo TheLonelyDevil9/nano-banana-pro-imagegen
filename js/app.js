@@ -8,7 +8,7 @@ import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastMo
 import { authMode, restoreServiceAccount, restoreAuthMode, setupAuthDragDrop } from './auth.js';
 import { refreshModels } from './models.js';
 import { renderRefs, loadRefImages, setupRefDragDrop, setupClipboardPaste, setupRefPreviewSwipe } from './references.js';
-import { initDB, loadHistory, useHistoryItem, toggleHistory } from './history.js';
+import { initDB, loadHistory, useHistoryItem, toggleHistory, restoreHistoryColumns } from './history.js';
 import { setupZoomHandlers, resetZoom, setCurrentImgRef } from './zoom.js';
 import { generate, loadSessionStats, setCurrentImg } from './generation.js';
 import { loadSavedPrompts, isDropdownOpen, closePromptsDropdown, saveCurrentPrompt } from './prompts.js';
@@ -107,6 +107,7 @@ async function init() {
 
     // Initialize database and load history
     await initDB();
+    restoreHistoryColumns();
     loadHistory();
     loadSavedPrompts();
 

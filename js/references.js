@@ -298,6 +298,7 @@ export function setupRefDragDrop() {
 }
 
 // Setup clipboard paste for reference images
+// Context-aware: routes to batch prompt boxes when batch modal is open
 export function setupClipboardPaste() {
     document.addEventListener('paste', async e => {
         const items = e.clipboardData?.items;
@@ -314,6 +315,16 @@ export function setupClipboardPaste() {
         if (imageFiles.length === 0) return;
         e.preventDefault();
 
+        // Check if batch setup modal is open — delegate to queueUI
+        try {
+            const { isBatchModalOpen, pasteRefsToBox } = await import('./queueUI.js');
+            if (isBatchModalOpen()) {
+                pasteRefsToBox(imageFiles);
+                return;
+            }
+        } catch { /* queueUI not loaded yet, fall through to global */ }
+
+        // Default: add to global refs
         let addedCount = 0;
         for (const file of imageFiles) {
             if (refImages.length >= MAX_REFS) {

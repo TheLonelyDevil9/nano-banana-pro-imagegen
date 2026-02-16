@@ -444,6 +444,21 @@ function onQueueComplete() {
     }
 
     notifyProgress();
+
+    // Auto-clear completed items after 5s so FAB hides (skip if failures exist for retry)
+    if (failed === 0) {
+        setTimeout(() => {
+            // Guard: don't clear if user started a new queue in the meantime
+            if (queueState.isRunning) return;
+            queueState.items = [];
+            queueState.completedCount = 0;
+            queueState.failedCount = 0;
+            queueState.generationTimes = [];
+            clearAllQueueRefs().catch(() => {});
+            persistQueueState();
+            notifyProgress();
+        }, 5000);
+    }
 }
 
 /**
@@ -630,6 +645,27 @@ function formatDuration(ms) {
  */
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Update config for all PENDING queue items
+ * Used to change generation settings mid-batch while paused
+ * @param {Object} newConfig - Partial or full config to apply
+ * @returns {number} Number of items updated
+ */
+export function updateQueueItemConfig(newConfig) {
+    let count = 0;
+    queueState.items.forEach(item => {
+        if (item.status === QueueStatus.PENDING) {
+            item.config = { ...item.config, ...newConfig };
+            count++;
+        }
+    });
+    if (count > 0) {
+        persistQueueState();
+        notifyProgress();
+    }
+    return count;
 }
 
 // Make functions globally available

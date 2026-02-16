@@ -450,6 +450,10 @@
       <button class="filter-btn active" id="filterAll" onclick="setHistoryFilter('all')">All</button>
       <button class="filter-btn" id="filterFavorites" onclick="setHistoryFilter('favorites')">★ Favorites</button>
     </div>
+    <div class="history-size-control">
+      <label for="historyColumns">Size</label>
+      <input type="range" id="historyColumns" min="2" max="5" value="3" oninput="setHistoryColumns(this.value)">
+    </div>
     <div class="history-list" id="historyList">
       <div class="history-empty">No images yet</div>
     </div>
@@ -544,7 +548,99 @@
       <button class="btn-primary" id="queueStartBtn" onclick="startQueue()">▶ Start</button>
       <button class="btn-secondary hidden" id="queuePauseBtn" onclick="pauseQueue()">⏸ Pause</button>
       <button class="btn-secondary hidden" id="queueResumeBtn" onclick="resumeQueue()">▶ Resume</button>
+      <button class="btn-secondary hidden" id="queueEditSettingsBtn" onclick="toggleQueueSettings()">⚙ Edit Settings</button>
       <button class="btn-cancel" id="queueCancelBtn" onclick="cancelQueue()" disabled>⏹ Cancel</button>
+    </div>
+    <!-- Inline settings override (shown when paused) -->
+    <div class="queue-settings-override hidden" id="queueSettingsOverride">
+      <div class="queue-settings-grid">
+        <div class="queue-settings-row">
+          <label>Aspect Ratio</label>
+          <select id="queueRatio">
+            <option value="">Auto</option>
+            <option value="1:1">1:1</option>
+            <option value="3:2">3:2</option>
+            <option value="2:3">2:3</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4">3:4</option>
+            <option value="4:5">4:5</option>
+            <option value="5:4">5:4</option>
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="21:9">21:9</option>
+          </select>
+        </div>
+        <div class="queue-settings-row">
+          <label>Resolution</label>
+          <select id="queueResolution">
+            <option value="1K">1K</option>
+            <option value="2K">2K</option>
+            <option value="4K">4K</option>
+          </select>
+        </div>
+        <div class="queue-settings-row">
+          <label>Thinking</label>
+          <select id="queueThinking">
+            <option value="-1">Auto</option>
+            <option value="0">Off</option>
+            <option value="1024">1K tokens</option>
+            <option value="4096">4K tokens</option>
+            <option value="8192">8K tokens</option>
+            <option value="16384">16K tokens</option>
+            <option value="24576">24K tokens</option>
+          </select>
+        </div>
+        <div class="queue-settings-row">
+          <label>Search</label>
+          <label class="switch"><input type="checkbox" id="queueSearch"><span class="slider"></span></label>
+        </div>
+      </div>
+      <div class="queue-settings-safety">
+        <label style="font-size:var(--font-size-xs);color:var(--text-muted);margin-bottom:4px;display:block;">Safety Overrides</label>
+        <div class="queue-settings-grid">
+          <div class="queue-settings-row">
+            <label>Harassment</label>
+            <select id="queueSafetyHarassment" class="safety-select">
+              <option value="">Keep</option>
+              <option value="BLOCK_NONE">None</option>
+              <option value="BLOCK_ONLY_HIGH">Low</option>
+              <option value="BLOCK_MEDIUM_AND_ABOVE">Medium</option>
+              <option value="BLOCK_LOW_AND_ABOVE">High</option>
+            </select>
+          </div>
+          <div class="queue-settings-row">
+            <label>Hate Speech</label>
+            <select id="queueSafetyHate" class="safety-select">
+              <option value="">Keep</option>
+              <option value="BLOCK_NONE">None</option>
+              <option value="BLOCK_ONLY_HIGH">Low</option>
+              <option value="BLOCK_MEDIUM_AND_ABOVE">Medium</option>
+              <option value="BLOCK_LOW_AND_ABOVE">High</option>
+            </select>
+          </div>
+          <div class="queue-settings-row">
+            <label>Sexual</label>
+            <select id="queueSafetySexual" class="safety-select">
+              <option value="">Keep</option>
+              <option value="BLOCK_NONE">None</option>
+              <option value="BLOCK_ONLY_HIGH">Low</option>
+              <option value="BLOCK_MEDIUM_AND_ABOVE">Medium</option>
+              <option value="BLOCK_LOW_AND_ABOVE">High</option>
+            </select>
+          </div>
+          <div class="queue-settings-row">
+            <label>Dangerous</label>
+            <select id="queueSafetyDangerous" class="safety-select">
+              <option value="">Keep</option>
+              <option value="BLOCK_NONE">None</option>
+              <option value="BLOCK_ONLY_HIGH">Low</option>
+              <option value="BLOCK_MEDIUM_AND_ABOVE">Medium</option>
+              <option value="BLOCK_LOW_AND_ABOVE">High</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="applySettingsToRemaining()" style="width:100%;margin-top:8px;">Apply to Remaining</button>
     </div>
     <div class="queue-item-list" id="queueItemList">
       <div class="queue-empty">No items in queue</div>

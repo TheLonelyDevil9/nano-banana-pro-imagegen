@@ -1534,6 +1534,51 @@ input:checked+.slider:before {
 }
 
 /* ==========================================================================
+   Queue Settings Override (inline, shown when paused)
+   ========================================================================== */
+
+.queue-settings-override {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--bg-surface-alt);
+}
+
+.queue-settings-override.hidden {
+    display: none;
+}
+
+.queue-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+}
+
+.queue-settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+}
+
+.queue-settings-row label {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.queue-settings-row select {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+}
+
+.queue-settings-safety {
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-default);
+}
+
+/* ==========================================================================
    Queue Progress FAB
    ========================================================================== */
 
@@ -1568,6 +1613,14 @@ input:checked+.slider:before {
 
 .queue-fab.generating {
     animation: fab-pulse 1.5s ease-in-out infinite;
+}
+
+.queue-fab.complete {
+    border-color: var(--color-success);
+}
+
+.queue-fab.complete .queue-fab-progress {
+    background: var(--color-success);
 }
 
 @keyframes fab-pulse {

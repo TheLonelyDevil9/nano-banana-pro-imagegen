@@ -102,15 +102,18 @@ my_batch/
 
 ### History & Favorites
 
-- Persistent storage via IndexedDB (database v3 with migration support)
+- Persistent storage via IndexedDB (database v4 with migration support)
 - **Two storage modes**:
   - Full image storage (when no output folder is set)
   - Thumbnail-only storage (when output folder is set — full image loaded on demand)
 - Favorites system with star toggle and filtering (all / favorites)
 - Load prompts and images from history into the current session
-- Infinite scroll pagination (15 items per page)
+- **Adjustable thumbnail size** — slider control (2–5 columns) with persistent preference
+- Infinite scroll pagination with auto-fill (loads pages until the panel overflows)
+- "Load More" fallback button when scroll detection doesn't trigger
 - Clear all (preserves favorites)
 - Delete individual items (also removes from filesystem if applicable)
+- Sync button to clean up entries for deleted files
 
 ### Image Viewing
 
@@ -296,9 +299,20 @@ All data stays in your browser — nothing is sent to any server except the Gemi
 | `MAX_QUEUE_ITEMS` | 100 | Maximum items in batch queue |
 | `MAX_VARIATIONS_PER_PROMPT` | 10 | Maximum variations per prompt box |
 | `DEFAULT_QUEUE_DELAY_MS` | 3000 | Default delay between batch generations |
-| `HISTORY_PAGE_SIZE` | 15 | Items per infinite scroll page |
+| `HISTORY_PAGE_SIZE` | 48 | Items per infinite scroll page |
 | `MAX_CONVERSATION_TURNS` | 10 | Max conversation turns for generation |
 | `FS_MAX_ZOOM` | 10x | Maximum zoom level in fullscreen |
+
+## File Formats & Sizes
+
+| Stage | Format | Size / Constraints |
+| ------- | -------- | -------------------- |
+| **Input (reference images)** | Any browser-readable (PNG, JPEG, WebP, GIF, BMP) | Compressed to max 2560px longest side, JPEG 0.85 quality |
+| **Sent to Gemini API** | base64 `inlineData` with original mimeType | Up to 14 images per request |
+| **API response** | Typically PNG | Whatever mimeType Gemini returns (usually `image/png`) |
+| **Filesystem output** | PNG | Named `YYYYMMDD_HHMMSS_prompt-snippet.png` |
+| **History thumbnails** | PNG data URL in IndexedDB | Max 150px longest dimension |
+| **History full images** | On disk (filesystem mode) or data URL in IndexedDB (legacy) | Full resolution |
 
 ## Browser Support
 

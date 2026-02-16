@@ -11,7 +11,8 @@ import {
     addToQueue,
     setOnProgress,
     setQueueDelay,
-    QueueStatus
+    QueueStatus,
+    updateQueueItemConfig
 } from './queue.js';
 import { getCurrentConfig } from './generation.js';
 import { getDirectoryInfo, selectOutputDirectory } from './filesystem.js';
@@ -22,6 +23,7 @@ import { MAX_REFS, DEFAULT_QUEUE_DELAY_MS } from './config.js';
 let promptBoxes = [];
 let currentBoxForRefs = null;
 let bulkRefMode = false;  // When true, file input adds to selected boxes
+let lastFocusedBoxId = null;  // Track last-focused box for clipboard paste
 
 // Multi-select state
 let selectedBoxIds = new Set();
@@ -253,6 +255,7 @@ export function setBoxVariations(id, variations) {
  */
 export function openBoxRefPicker(boxId) {
     currentBoxForRefs = boxId;
+    lastFocusedBoxId = boxId;
     const input = $('boxRefInput');
     if (input) {
         input.value = '';
@@ -497,6 +500,7 @@ function renderPromptBoxes() {
                 <div class="prompt-box-body">
                     <textarea class="prompt-box-textarea"
                         placeholder="Enter your prompt..."
+                        onfocus="setLastFocusedBox('${box.id}')"
                         oninput="updateBoxPrompt('${box.id}', this.value)">${escapeHtml(box.prompt)}</textarea>
                 </div>
                 <div class="prompt-box-footer">
@@ -749,6 +753,18 @@ export function renderQueuePanel() {
     if (pauseBtn) pauseBtn.classList.toggle('hidden', !state.isRunning || state.isPaused);
     if (resumeBtn) resumeBtn.classList.toggle('hidden', !state.isPaused);
     if (cancelBtn) cancelBtn.disabled = !state.isRunning && stats.total === 0;
+
+    // Show "Edit Settings" button only when paused with pending items
+    const editSettingsBtn = $('queueEditSettingsBtn');
+    if (editSettingsBtn) {
+        editSettingsBtn.classList.toggle('hidden', !(state.isPaused && stats.pending > 0));
+    }
+
+    // Hide settings panel if queue is no longer paused
+    if (!state.isPaused) {
+        const settingsPanel = $('queueSettingsOverride');
+        if (settingsPanel) settingsPanel.classList.add('hidden');
+    }
 
     // Render item list
     renderQueueItemList(state.items);
@@ -1281,9 +1297,12 @@ export function updateQueueFab() {
 
     if (!shouldShow) return;
 
-    // Update text
+    // Determine if queue just finished (not running, nothing pending/generating)
+    const isComplete = !state.isRunning && !state.isPaused && stats.pending === 0 && stats.inProgress === 0;
+
+    // Update text — show checkmark when done, counter when active
     if (fabText) {
-        fabText.textContent = `${stats.completed}/${stats.total}`;
+        fabText.textContent = isComplete ? '✓' : `${stats.completed}/${stats.total}`;
     }
 
     // Update progress bar
@@ -1293,6 +1312,183 @@ export function updateQueueFab() {
 
     // Add/remove generating animation
     fab.classList.toggle('generating', state.isRunning && !state.isPaused);
+    fab.classList.toggle('complete', isComplete);
+}
+
+/**
+ * Toggle the inline settings override panel and populate from first pending item
+ */
+export function toggleQueueSettings() {
+    const panel = $('queueSettingsOverride');
+    if (!panel) return;
+
+    const isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+
+    // Populate from first pending item's config when opening
+    if (isHidden) {
+        const state = getQueueState();
+        const firstPending = state.items.find(i => i.status === QueueStatus.PENDING);
+        if (firstPending && firstPending.config) {
+            const c = firstPending.config;
+            const qRatio = $('queueRatio');
+            const qRes = $('queueResolution');
+            const qThinking = $('queueThinking');
+            const qSearch = $('queueSearch');
+
+            if (qRatio) qRatio.value = c.ratio || '';
+            if (qRes) qRes.value = c.resolution || '2K';
+            if (qThinking) {
+                // Find closest option
+                const budget = c.thinkingBudget !== undefined ? c.thinkingBudget : -1;
+                const options = Array.from(qThinking.options).map(o => parseInt(o.value));
+                const closest = options.reduce((prev, curr) =>
+                    Math.abs(curr - budget) < Math.abs(prev - budget) ? curr : prev
+                );
+                qThinking.value = closest.toString();
+            }
+            if (qSearch) qSearch.checked = !!c.searchEnabled;
+
+            // Reset safety dropdowns to "Keep" (don't override unless user explicitly picks)
+            ['queueSafetyHarassment', 'queueSafetyHate', 'queueSafetySexual', 'queueSafetyDangerous'].forEach(id => {
+                const el = $(id);
+                if (el) el.value = '';
+            });
+        }
+    }
+}
+
+/**
+ * Apply settings from the override panel to all pending queue items
+ */
+export function applySettingsToRemaining() {
+    const newConfig = {};
+
+    const qRatio = $('queueRatio');
+    const qRes = $('queueResolution');
+    const qThinking = $('queueThinking');
+    const qSearch = $('queueSearch');
+
+    if (qRatio) newConfig.ratio = qRatio.value;
+    if (qRes) newConfig.resolution = qRes.value;
+    if (qThinking) newConfig.thinkingBudget = parseInt(qThinking.value);
+    if (qSearch) newConfig.searchEnabled = qSearch.checked;
+
+    // Build safety settings — only include categories the user explicitly changed
+    const safetyMap = [
+        { id: 'queueSafetyHarassment', category: 'HARM_CATEGORY_HARASSMENT' },
+        { id: 'queueSafetyHate', category: 'HARM_CATEGORY_HATE_SPEECH' },
+        { id: 'queueSafetySexual', category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT' },
+        { id: 'queueSafetyDangerous', category: 'HARM_CATEGORY_DANGEROUS_CONTENT' }
+    ];
+
+    const safetyOverrides = [];
+    safetyMap.forEach(({ id, category }) => {
+        const el = $(id);
+        if (el && el.value) {
+            safetyOverrides.push({ category, threshold: el.value });
+        }
+    });
+
+    // If any safety overrides were set, merge them with existing settings
+    if (safetyOverrides.length > 0) {
+        // We need to handle this per-item since each might have different existing safety
+        // For simplicity, just set the full array (user can set all 4 if they want granular control)
+        const state = getQueueState();
+        const firstPending = state.items.find(i => i.status === QueueStatus.PENDING);
+        const existingSafety = firstPending?.config?.safetySettings || [];
+
+        // Merge: override categories that user changed, keep others
+        const mergedSafety = [...existingSafety];
+        safetyOverrides.forEach(override => {
+            const idx = mergedSafety.findIndex(s => s.category === override.category);
+            if (idx >= 0) {
+                mergedSafety[idx] = override;
+            } else {
+                mergedSafety.push(override);
+            }
+        });
+        newConfig.safetySettings = mergedSafety;
+    }
+
+    const count = updateQueueItemConfig(newConfig);
+
+    // Hide the settings panel
+    const panel = $('queueSettingsOverride');
+    if (panel) panel.classList.add('hidden');
+
+    showToast(`Settings applied to ${count} remaining item${count !== 1 ? 's' : ''}`);
+}
+
+/**
+ * Set the last-focused prompt box (called from textarea onfocus)
+ */
+export function setLastFocusedBox(boxId) {
+    lastFocusedBoxId = boxId;
+}
+
+/**
+ * Check if the batch setup modal is currently open
+ */
+export function isBatchModalOpen() {
+    return $('queueSetupModal')?.classList.contains('open') || false;
+}
+
+/**
+ * Paste reference images from clipboard into prompt box(es)
+ * Called by the global paste handler when batch modal is open
+ * @param {File[]} imageFiles - Array of image files from clipboard
+ */
+export async function pasteRefsToBox(imageFiles) {
+    // Determine target boxes
+    let targetBoxIds = [];
+    if (selectedBoxIds.size > 0) {
+        targetBoxIds = [...selectedBoxIds];
+    } else if (lastFocusedBoxId && promptBoxes.find(b => b.id === lastFocusedBoxId)) {
+        targetBoxIds = [lastFocusedBoxId];
+    } else if (promptBoxes.length > 0) {
+        targetBoxIds = [promptBoxes[0].id];
+    } else {
+        return;
+    }
+
+    // Compress images
+    const newRefs = [];
+    for (const file of imageFiles) {
+        try {
+            const dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = ev => resolve(ev.target.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            const compressed = await compressImage(dataUrl);
+            newRefs.push({ data: compressed });
+        } catch (err) {
+            console.error('Error processing pasted image:', err);
+        }
+    }
+
+    if (newRefs.length === 0) return;
+
+    // Add to target boxes
+    for (const boxId of targetBoxIds) {
+        const box = promptBoxes.find(b => b.id === boxId);
+        if (!box) continue;
+        if (!box.refImages) box.refImages = [];
+
+        for (const ref of newRefs) {
+            if (box.refImages.length >= MAX_REFS) break;
+            box.refImages.push({ id: Date.now() + Math.random(), data: ref.data });
+        }
+    }
+
+    renderPromptBoxes();
+
+    const label = targetBoxIds.length === 1
+        ? `Prompt ${promptBoxes.findIndex(b => b.id === targetBoxIds[0]) + 1}`
+        : `${targetBoxIds.length} prompts`;
+    showToast(`${newRefs.length} image${newRefs.length > 1 ? 's' : ''} pasted to ${label}`);
 }
 
 // Make functions globally available
@@ -1320,3 +1516,6 @@ window.openBulkRefPicker = openBulkRefPicker;
 window.clearSelectedBoxRefs = clearSelectedBoxRefs;
 window.handleBatchButtonClick = handleBatchButtonClick;
 window.duplicatePromptBox = duplicatePromptBox;
+window.toggleQueueSettings = toggleQueueSettings;
+window.applySettingsToRemaining = applySettingsToRemaining;
+window.setLastFocusedBox = setLastFocusedBox;

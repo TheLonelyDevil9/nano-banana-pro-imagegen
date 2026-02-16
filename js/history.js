@@ -215,6 +215,11 @@ export function loadHistory(append = false) {
     if (isLoadingHistory) return;
     isLoadingHistory = true;
 
+    // Reset offset on full reload
+    if (!append) {
+        historyOffset = 0;
+    }
+
     const tx = db.transaction('history', 'readonly');
     const items = [];
 
@@ -244,12 +249,17 @@ function renderHistoryItems(append = false) {
     const startIdx = append ? historyOffset * HISTORY_PAGE_SIZE : 0;
     const endIdx = (historyOffset + 1) * HISTORY_PAGE_SIZE;
     const itemsToShow = allHistoryItems.slice(startIdx, endIdx);
+    const hasMore = allHistoryItems.length > endIdx;
 
     if (allHistoryItems.length === 0) {
         historyList.innerHTML = '<div class="history-empty">' +
             (historyFilter === 'favorites' ? 'No favorites yet' : 'No images yet') + '</div>';
         return;
     }
+
+    // Remove existing "Load More" button before rendering
+    const existingLoadMore = historyList.querySelector('.history-load-more');
+    if (existingLoadMore) existingLoadMore.remove();
 
     // Create elements using DocumentFragment for better performance
     if (append) {
@@ -268,6 +278,18 @@ function renderHistoryItems(append = false) {
         historyList.appendChild(fragment);
     }
 
+    // Add "Load More" button if there are more items
+    if (hasMore) {
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'history-load-more';
+        loadMoreBtn.textContent = `Load more (${allHistoryItems.length - endIdx} remaining)`;
+        loadMoreBtn.onclick = () => {
+            historyOffset++;
+            renderHistoryItems(true);
+        };
+        historyList.appendChild(loadMoreBtn);
+    }
+
     // Setup infinite scroll
     if (!historyList.dataset.scrollSetup) {
         historyList.dataset.scrollSetup = 'true';
@@ -280,6 +302,26 @@ function renderHistoryItems(append = false) {
             }
         });
     }
+
+    // Auto-fill: if content doesn't overflow, load more pages until it does
+    autoFillHistory(historyList);
+}
+
+// Auto-fill: keep loading pages until the container overflows or all items are shown
+let autoFillIterations = 0;
+function autoFillHistory(historyList) {
+    const hasMore = allHistoryItems.length > (historyOffset + 1) * HISTORY_PAGE_SIZE;
+    const hasOverflow = historyList.scrollHeight > historyList.clientHeight + 50;
+
+    if (!hasMore || hasOverflow || autoFillIterations >= 10) {
+        autoFillIterations = 0;
+        return;
+    }
+
+    autoFillIterations++;
+    historyOffset++;
+    // Use rAF to let the DOM settle before checking overflow again
+    requestAnimationFrame(() => renderHistoryItems(true));
 }
 
 // Create a single history item element
@@ -867,6 +909,28 @@ export function deleteRefSet(id) {
     });
 }
 
+// History column size control
+export function setHistoryColumns(cols) {
+    const historyList = $('historyList');
+    if (historyList) {
+        historyList.style.setProperty('--history-columns', cols);
+    }
+    localStorage.setItem('history_columns', cols);
+    // Re-trigger auto-fill since fewer columns may need more items
+    autoFillIterations = 0;
+    autoFillHistory(historyList);
+}
+
+export function restoreHistoryColumns() {
+    const saved = localStorage.getItem('history_columns');
+    if (saved) {
+        const slider = $('historyColumns');
+        if (slider) slider.value = saved;
+        const historyList = $('historyList');
+        if (historyList) historyList.style.setProperty('--history-columns', saved);
+    }
+}
+
 // Make functions globally available for HTML onclick handlers
 window.toggleHistory = toggleHistory;
 window.setHistoryFilter = setHistoryFilter;
@@ -879,3 +943,4 @@ window.clearHistory = clearHistory;
 window.useHistoryPromptOnly = useHistoryPromptOnly;
 window.useHistoryRefs = useHistoryRefs;
 window.syncHistoryWithFilesystem = syncHistoryWithFilesystem;
+window.setHistoryColumns = setHistoryColumns;
