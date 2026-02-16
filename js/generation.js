@@ -11,7 +11,7 @@ import { saveToHistory, saveToHistoryThumbnailOnly } from './history.js';
 import { saveLastModel, persistAllInputs } from './persistence.js';
 import { resetZoom, setCurrentImgRef, getCurrentImg } from './zoom.js';
 import { MAX_REFS, MAX_CONVERSATION_TURNS } from './config.js';
-import { saveImageToFilesystem, getDirectoryInfo } from './filesystem.js';
+import { saveImageToFilesystem, getDirectoryInfo, ensurePngDataUrl } from './filesystem.js';
 
 // Generation state
 let currentImg = null;
@@ -186,11 +186,9 @@ export async function generateSingleImage(prompt, config, refImagesData = [], si
 
     // Build generation config
     const genConfig = { responseModalities: ['TEXT', 'IMAGE'] };
-    if (config.ratio || config.resolution) {
-        genConfig.imageConfig = {};
-        if (config.ratio) genConfig.imageConfig.aspectRatio = config.ratio;
-        if (config.resolution) genConfig.imageConfig.imageSize = config.resolution;
-    }
+    genConfig.imageConfig = { outputMimeType: 'image/png' };
+    if (config.ratio) genConfig.imageConfig.aspectRatio = config.ratio;
+    if (config.resolution) genConfig.imageConfig.imageSize = config.resolution;
 
     // Handle thinking config
     if (config.thinkingBudget !== undefined) {
@@ -406,10 +404,11 @@ export function iterate() {
 }
 
 // Download current image
-export function download() {
+export async function download() {
     if (!currentImg) return;
+    const pngDataUrl = await ensurePngDataUrl(currentImg);
     const a = document.createElement('a');
-    a.href = currentImg;
+    a.href = pngDataUrl;
     a.download = 'nano-banana-' + Date.now() + '.png';
     a.click();
 }

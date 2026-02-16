@@ -214,6 +214,45 @@ export function generateFilename(prompt, variationIndex = 0, batchName = '') {
 }
 
 /**
+ * Convert a blob to PNG if it isn't already.
+ * @param {Blob} blob
+ * @returns {Promise<Blob>} PNG blob
+ */
+function ensurePngBlob(blob) {
+    if (blob.type === 'image/png') return Promise.resolve(blob);
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(pngBlob => pngBlob ? resolve(pngBlob) : reject(new Error('PNG conversion failed')), 'image/png');
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image for PNG conversion')); };
+        img.src = url;
+    });
+}
+
+/**
+ * Convert a data URL to a PNG data URL if it isn't already.
+ * @param {string} dataUrl
+ * @returns {Promise<string>} PNG data URL
+ */
+export async function ensurePngDataUrl(dataUrl) {
+    if (dataUrl.startsWith('data:image/png')) return dataUrl;
+    const resp = await fetch(dataUrl);
+    const blob = await ensurePngBlob(await resp.blob());
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+    });
+}
+
+/**
  * Save image to filesystem
  * @param {string} imageDataUrl - The image data URL
  * @param {string} prompt - The prompt text
@@ -230,9 +269,10 @@ export async function saveImageToFilesystem(imageDataUrl, prompt, variationIndex
         const filename = generateFilename(prompt, variationIndex, batchName);
         const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
 
-        // Convert data URL to blob
+        // Convert data URL to blob, ensuring PNG format
         const response = await fetch(imageDataUrl);
-        const blob = await response.blob();
+        const rawBlob = await response.blob();
+        const blob = await ensurePngBlob(rawBlob);
 
         // Write to file
         const writable = await fileHandle.createWritable();
@@ -265,10 +305,11 @@ export async function saveImageToFilesystem(imageDataUrl, prompt, variationIndex
 /**
  * Fallback: trigger browser download
  */
-function triggerDownload(imageDataUrl, prompt, variationIndex, batchName = '') {
+async function triggerDownload(imageDataUrl, prompt, variationIndex, batchName = '') {
     const filename = generateFilename(prompt, variationIndex, batchName);
+    const pngDataUrl = await ensurePngDataUrl(imageDataUrl);
     const a = document.createElement('a');
-    a.href = imageDataUrl;
+    a.href = pngDataUrl;
     a.download = filename;
     a.click();
 
