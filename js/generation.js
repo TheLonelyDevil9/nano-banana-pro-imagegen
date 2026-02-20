@@ -186,7 +186,7 @@ export async function generateSingleImage(prompt, config, refImagesData = [], si
 
     // Build generation config
     const genConfig = { responseModalities: ['TEXT', 'IMAGE'] };
-    genConfig.imageConfig = { outputMimeType: 'image/png' };
+    genConfig.imageConfig = {};
     if (config.ratio) genConfig.imageConfig.aspectRatio = config.ratio;
     if (config.resolution) genConfig.imageConfig.imageSize = config.resolution;
 

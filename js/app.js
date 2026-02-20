@@ -208,7 +208,7 @@ async function init() {
         refreshModels();
     }
 
-    console.log('🍌 Nano Banana Pro initialized');
+    console.log('🍌 NBPI initialized');
 }
 
 /**

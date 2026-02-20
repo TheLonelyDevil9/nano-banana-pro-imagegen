@@ -1,9 +1,9 @@
 @echo off
-REM Nano Banana Pro - Windows Start Script
+REM NBPI - Windows Start Script
 REM Double-click this file to start the app
 
 cd /d "%~dp0"
-echo Starting Nano Banana Pro...
+echo Starting NBPI...
 echo.
 
 set PORT=4648

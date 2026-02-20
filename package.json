@@ -1,5 +1,5 @@
 {
-    "name": "nano-banana-pro",
+    "name": "nbpi",
     "version": "2.0.0",
     "description": "Feature-rich Gemini image generation client with batch queue, filesystem output, and dual auth support",
     "main": "index.html",

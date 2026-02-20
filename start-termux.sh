@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Nano Banana Pro - Termux Launcher
+# NBPI - Termux Launcher
 # Run this script, then you can close Termux - server keeps running
 #
 # Usage: bash start-termux.sh

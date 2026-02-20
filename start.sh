@@ -1,9 +1,9 @@
 #!/bin/bash
-# Nano Banana Pro - Linux/Mac Start Script
+# NBPI - Linux/Mac Start Script
 # Run: chmod +x start.sh && ./start.sh
 
 cd "$(dirname "$0")"
-echo "Starting Nano Banana Pro..."
+echo "Starting NBPI..."
 echo ""
 
 PORT=4648

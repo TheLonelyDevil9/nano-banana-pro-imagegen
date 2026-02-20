@@ -1236,7 +1236,7 @@ function escapeHtml(text) {
  */
 export function downloadBatchTemplate() {
     const template = {
-        _comment: 'Batch import template for Nano Banana Pro',
+        _comment: 'Batch import template for NBPI',
         _instructions: 'Place this file in a folder with a refs/ subfolder containing your reference images',
         delay: 3000,
         prompts: [

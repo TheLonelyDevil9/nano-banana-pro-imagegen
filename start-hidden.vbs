@@ -1,4 +1,4 @@
-' Nano Banana Pro - Hidden Launcher for Windows
+' NBPI - Hidden Launcher for Windows
 ' Double-click this file to start the app without a visible terminal window
 ' The server runs in the background and your browser opens automatically
 

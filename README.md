@@ -1,9 +1,9 @@
-# Nano Banana Pro
+# NBPI
 
 A powerful, feature-rich Gemini image generation client that runs entirely in your browser. No server, no build tools, no dependencies — just open and generate.
 
 <p align="center">
-  <img src="assets/banner.jpg" alt="Nano Banana Pro" width="1200">
+  <img src="assets/banner.jpg" alt="NBPI" width="1200">
 </p>
 
 ## Features
@@ -163,8 +163,8 @@ my_batch/
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/nano-banana-pro.git
-cd nano-banana-pro
+git clone https://github.com/yourusername/nbpi.git
+cd nbpi
 
 # Start local server
 npx serve -l 4648
@@ -199,7 +199,7 @@ Fork this repo and enable GitHub Pages in Settings → Pages → Deploy from `ma
 ## Project Structure
 
 ```
-nano-banana-pro/
+nbpi/
 ├── index.html            # Single-page application entry point
 ├── package.json          # Project metadata
 ├── start.bat             # Windows launcher (with terminal)
