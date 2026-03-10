@@ -3,23 +3,7 @@
  * LocalStorage save/restore for inputs and settings
  */
 
-import { $, debounce, updateThinkingLabel, showToast } from './ui.js';
-
-// Re-export for other modules
-export { debounce };
-
-// Get auth mode (avoid circular import)
-function getAuthMode() {
-    return localStorage.getItem('input_authMode') || 'apikey';
-}
-
-// Get ref images from localStorage (avoid circular import)
-function getRefImagesFromStorage() {
-    try {
-        const val = localStorage.getItem('input_refImages');
-        return val !== null ? JSON.parse(val) : [];
-    } catch { return []; }
-}
+import { $, updateThinkingLabel } from './ui.js';
 
 // Persist a single input value
 export function persistInput(key, value) {
@@ -130,8 +114,3 @@ export function updateThinkingNote() {
     }
 }
 
-// Manual save settings (for user reassurance)
-export function saveSettings() {
-    persistAllInputs();
-    showToast('Settings saved!');
-}

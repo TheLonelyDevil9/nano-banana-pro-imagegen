@@ -158,11 +158,6 @@
         gap: var(--spacing-lg);
     }
 
-    .right-panel .stats-bar {
-        max-width: 400px;
-        margin: 0 auto;
-    }
-
     /* Adjust image box for desktop */
     .image-box {
         aspect-ratio: auto;

@@ -4,17 +4,16 @@
  */
 
 import { $, debounce, restoreCollapsibleStates, updateCharCounter, updateAspectPreview, updateThinkingLabel, openPromptEditor, closePromptEditor, updatePromptEditorCounter, showToast, restoreTheme } from './ui.js';
-import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastModel, saveSettings } from './persistence.js';
-import { authMode, restoreServiceAccount, restoreAuthMode, setupAuthDragDrop } from './auth.js';
+import { restoreAllInputs, setupInputPersistence, updateThinkingNote, saveLastModel } from './persistence.js';
 import { refreshModels } from './models.js';
-import { renderRefs, loadRefImages, setupRefDragDrop, setupClipboardPaste, setupRefPreviewSwipe } from './references.js';
-import { initDB, loadHistory, useHistoryItem, toggleHistory, restoreHistoryColumns } from './history.js';
-import { setupZoomHandlers, resetZoom, setCurrentImgRef } from './zoom.js';
-import { generate, loadSessionStats, setCurrentImg } from './generation.js';
+import { loadRefImages, setupRefDragDrop, setupClipboardPaste, setupRefPreviewSwipe } from './references.js';
+import { initDB } from './history.js';
+import { setupZoomHandlers } from './zoom.js';
+import { generate } from './generation.js';
 import { loadSavedPrompts, isDropdownOpen, closePromptsDropdown, saveCurrentPrompt } from './prompts.js';
 import { isFileSystemSupported, restoreDirectoryHandle } from './filesystem.js';
 import { restoreQueueState, hasResumableQueue } from './queue.js';
-import { initQueueUI, updateDirectoryDisplay, handleBatchButtonClick, toggleQueuePanel, closeQueueSetup } from './queueUI.js';
+import { initQueueUI, handleBatchButtonClick, toggleQueuePanel, closeQueueSetup } from './queueUI.js';
 
 // Initialize application
 async function init() {
@@ -23,14 +22,6 @@ async function init() {
 
     // Restore credentials from localStorage
     $('apiKey').value = localStorage.getItem('gemini_api_key') || '';
-    $('projectId').value = localStorage.getItem('vertex_project_id') || '';
-    $('vertexLocation').value = localStorage.getItem('vertex_location') || 'global';
-
-    // Restore service account
-    restoreServiceAccount();
-
-    // Load stats
-    loadSessionStats();
 
     // Restore all inputs and UI state
     restoreAllInputs();
@@ -40,9 +31,6 @@ async function init() {
     // Load reference images
     loadRefImages();
 
-    // Restore auth mode (must be after refs are loaded)
-    restoreAuthMode();
-
     // Initialize UI elements
     updateCharCounter();
     updateAspectPreview();
@@ -50,18 +38,8 @@ async function init() {
     // API key change handler
     $('apiKey').addEventListener('input', debounce(() => {
         localStorage.setItem('gemini_api_key', $('apiKey').value);
-        if (authMode === 'apikey' && $('apiKey').value.length > 20) refreshModels();
+        if ($('apiKey').value.length > 20) refreshModels();
     }, 500));
-
-    // Project ID change handler
-    $('projectId').addEventListener('input', debounce(() => {
-        localStorage.setItem('vertex_project_id', $('projectId').value);
-    }, 500));
-
-    // Vertex location change handler
-    $('vertexLocation').addEventListener('change', () => {
-        localStorage.setItem('vertex_location', $('vertexLocation').value);
-    });
 
     // Thinking toggle handler
     $('thinkingToggle').addEventListener('change', () => {
@@ -89,7 +67,6 @@ async function init() {
     });
 
     // Setup drag and drop
-    setupAuthDragDrop();
     setupRefDragDrop();
     setupClipboardPaste();
     setupRefPreviewSwipe();
@@ -97,18 +74,8 @@ async function init() {
     // Setup zoom handlers
     setupZoomHandlers();
 
-    // Make useHistoryItem work with zoom reset
-    window.useHistoryItem = () => {
-        useHistoryItem(setCurrentImg, resetZoom);
-    };
-
-    // Make saveSettings globally available
-    window.saveSettings = saveSettings;
-
-    // Initialize database and load history
+    // Initialize database
     await initDB();
-    restoreHistoryColumns();
-    loadHistory();
     loadSavedPrompts();
 
     // Initialize filesystem module
@@ -183,13 +150,6 @@ async function init() {
             return;
         }
 
-        // Ctrl+H - Toggle history panel
-        if (e.ctrlKey && e.key === 'h') {
-            e.preventDefault();
-            toggleHistory();
-            return;
-        }
-
         // Ctrl+S - Save current prompt (if prompts dropdown exists)
         if (e.ctrlKey && e.key === 's') {
             e.preventDefault();
@@ -215,13 +175,6 @@ async function init() {
  * Close all open modals and panels
  */
 function closeAllModals() {
-    // Close preview modal
-    const previewModal = $('previewModal');
-    if (previewModal?.classList.contains('open')) {
-        previewModal.classList.remove('open');
-        return;
-    }
-
     // Close queue setup modal
     const queueSetupModal = $('queueSetupModal');
     if (queueSetupModal?.classList.contains('open')) {
@@ -233,13 +186,6 @@ function closeAllModals() {
     const queuePanel = $('queuePanel');
     if (queuePanel?.classList.contains('open')) {
         toggleQueuePanel(false);
-        return;
-    }
-
-    // Close history panel
-    const historyPanel = $('historyPanel');
-    if (historyPanel?.classList.contains('open')) {
-        toggleHistory();
         return;
     }
 

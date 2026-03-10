@@ -77,9 +77,8 @@
   --transition-normal: 0.3s;
 
   /* Z-index */
-  --z-overlay: 140;
-  --z-history: 150;
-  --z-preview: 200;
+  --z-panel: 150;
+  --z-modal: 200;
   --z-fullscreen: 300;
   --z-fullscreen-controls: 310;
 
@@ -93,7 +92,6 @@
   --container-max-width-xl: 1600px;
   --left-panel-width: 420px;
   --left-panel-width-xl: 480px;
-  --history-panel-max-width: 520px;
   --left-panel-width-xxl: 580px;
   --container-max-width-xxl: 2200px;
 }

@@ -1,10 +1,9 @@
 /**
  * API Module
- * Gemini and Vertex AI API calls with retry logic
+ * Gemini API calls with retry logic
  */
 
 import { MAX_RETRIES, RETRY_DELAYS } from './config.js';
-import { authMode, getVertexAccessToken, clearToken } from './auth.js';
 import { $, updatePlaceholder } from './ui.js';
 
 // Check if error should trigger retry
@@ -29,46 +28,10 @@ export function parseApiError(error, status) {
     }
 
     if (status === 401 || status === 403) {
-        return { type: 'auth', message: 'Authentication failed. Check your credentials.' };
+        return { type: 'auth', message: 'Authentication failed. Check your API key.' };
     }
 
     return { type: 'generic', message: msg };
-}
-
-// Get Vertex endpoint URL
-export function getVertexEndpoint(model) {
-    const location = $('vertexLocation').value;
-    const project = $('projectId').value;
-
-    if (location === 'global') {
-        return 'https://aiplatform.googleapis.com/v1/projects/' + project + '/locations/global/publishers/google/models/' + model + ':generateContent';
-    }
-
-    return 'https://' + location + '-aiplatform.googleapis.com/v1/projects/' + project + '/locations/' + location + '/publishers/google/models/' + model + ':generateContent';
-}
-
-// Vertex AI generate content
-export async function vertexGenerateContent(model, body, signal) {
-    const token = await getVertexAccessToken();
-    const endpoint = getVertexEndpoint(model);
-
-    const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body),
-        signal: signal
-    });
-
-    const data = await response.json();
-    if (data.error) {
-        const err = new Error(data.error.message);
-        err.status = response.status;
-        throw err;
-    }
-    return data;
 }
 
 // API Key generate content
@@ -100,21 +63,11 @@ export async function generateWithRetry(model, body, signal) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             updatePlaceholder('Generating... (Attempt ' + attempt + '/' + MAX_RETRIES + ')');
-
-            if (authMode === 'apikey') {
-                data = await apiKeyGenerateContent(model, body, apiKey, signal);
-            } else if (authMode === 'vertex') {
-                data = await vertexGenerateContent(model, body, signal);
-            }
+            data = await apiKeyGenerateContent(model, body, apiKey, signal);
             break;
         } catch (e) {
             if (!shouldRetry(e, e.status) || attempt === MAX_RETRIES) {
                 throw e;
-            }
-
-            // Clear token on auth errors for Vertex
-            if (authMode === 'vertex' && (e.status === 401 || e.status === 403)) {
-                clearToken();
             }
 
             const delay = RETRY_DELAYS[attempt - 1];

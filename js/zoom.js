@@ -96,11 +96,6 @@ export function closeFullscreen() {
     $('fullscreenModal').classList.remove('open');
 }
 
-// Get current scale (for external checks)
-export function getScale() {
-    return scale;
-}
-
 // Setup all zoom event handlers
 export function setupZoomHandlers() {
     const imageBox = $('imageBox');

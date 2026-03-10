@@ -1,25 +1,20 @@
 /**
  * Generation Module
- * Image generation orchestration, stats, conversation management
+ * Image generation orchestration
  */
 
 import { $, showToast, haptic, playNotificationSound, updatePlaceholder, scrollToResult } from './ui.js';
-import { authMode, serviceAccount } from './auth.js';
 import { generateWithRetry, parseApiError } from './api.js';
 import { refImages, renderRefs } from './references.js';
-import { saveToHistory, saveToHistoryThumbnailOnly } from './history.js';
 import { saveLastModel, persistAllInputs } from './persistence.js';
-import { resetZoom, setCurrentImgRef, getCurrentImg } from './zoom.js';
-import { MAX_REFS, MAX_CONVERSATION_TURNS } from './config.js';
-import { saveImageToFilesystem, getDirectoryInfo, ensurePngDataUrl } from './filesystem.js';
+import { resetZoom, setCurrentImgRef } from './zoom.js';
+import { MAX_REFS } from './config.js';
+import { saveImageToFilesystem, deleteFromFilesystem, getDirectoryInfo } from './filesystem.js';
 
 // Generation state
 let currentImg = null;
+let currentFilename = null;
 let abortController = null;
-let generationStartTime = null;
-let generationCount = 0;
-let totalTokensUsed = 0;
-let generationStats = {};
 
 // Cached DOM elements
 let cachedElements = null;
@@ -35,7 +30,6 @@ function getCachedElements() {
             searchToggle: $('searchToggle'),
             thinkingToggle: $('thinkingToggle'),
             thinkingBudget: $('thinkingBudget'),
-            projectId: $('projectId'),
             generateBtn: $('generateBtn'),
             cancelBtn: $('cancelBtn'),
             spinner: $('spinner'),
@@ -45,90 +39,32 @@ function getCachedElements() {
             imageBox: $('imageBox'),
             placeholder: $('placeholder'),
             iterateBtn: $('iterateBtn'),
-            downloadBtn: $('downloadBtn'),
-            copyBtn: $('copyBtn'),
-            regenerateBtn: $('regenerateBtn'),
-            clearOutputBtn: $('clearOutputBtn'),
-            timeEstimate: $('timeEstimate'),
-            genCountStat: $('genCountStat'),
-            tokenStat: $('tokenStat')
+            deleteBtn: $('deleteBtn')
         };
     }
     return cachedElements;
 }
 
-// Set current image
+// Set current image (and update zoom module)
 export function setCurrentImg(img) {
     currentImg = img;
     setCurrentImgRef(img);
 }
 
-// Get current image
-export function getImg() {
-    return currentImg;
-}
-
-// Estimate tokens
-function estimateTokens(promptText, refCount) {
-    return Math.round(promptText.length / 4) + (refCount * 1000) + 500;
-}
-
-// Update stats display
-export function updateStats() {
+// Show image in the right panel (used by queue completion callback)
+export function showImageResult(imageData, filename) {
     const el = getCachedElements();
-    el.genCountStat.textContent = generationCount;
-    el.tokenStat.textContent = totalTokensUsed.toLocaleString();
-    sessionStorage.setItem('session_stats', JSON.stringify({
-        generationCount, totalTokensUsed
-    }));
-}
+    currentImg = imageData;
+    currentFilename = filename || null;
+    setCurrentImgRef(currentImg);
 
-// Load session stats
-export function loadSessionStats() {
-    try {
-        const sessionStats = JSON.parse(sessionStorage.getItem('session_stats') || '{}');
-        generationCount = sessionStats.generationCount || 0;
-        totalTokensUsed = sessionStats.totalTokensUsed || 0;
-        updateStats();
-    } catch { }
-
-    try {
-        generationStats = JSON.parse(localStorage.getItem('generation_stats') || '{}');
-    } catch { generationStats = {}; }
-}
-
-// Get stats key for time estimation
-function getStatsKey() {
-    const el = getCachedElements();
-    return el.modelSelect.value + '_' + el.resolution.value;
-}
-
-// Record generation time
-function recordGenerationTime(duration) {
-    const key = getStatsKey();
-    if (!generationStats[key]) generationStats[key] = [];
-    generationStats[key].push(duration);
-    if (generationStats[key].length > 10) generationStats[key].shift();
-    localStorage.setItem('generation_stats', JSON.stringify(generationStats));
-}
-
-// Get estimated time
-function getEstimatedTime() {
-    const key = getStatsKey();
-    const times = generationStats[key];
-    if (!times || times.length === 0) return null;
-    const avg = times.reduce((a, b) => a + b, 0) / times.length;
-    return Math.round(avg / 1000);
-}
-
-// Show time estimate
-function showTimeEstimate() {
-    const est = getEstimatedTime();
-    const el = getCachedElements();
-    if (est && el.timeEstimate) {
-        el.timeEstimate.textContent = 'Est. ~' + est + 's';
-        el.timeEstimate.classList.remove('hidden');
-    }
+    el.resultImg.src = currentImg;
+    el.resultImg.classList.remove('hidden');
+    el.placeholder.classList.add('hidden');
+    el.imageBox.classList.add('has-image');
+    el.iterateBtn.disabled = false;
+    el.deleteBtn.disabled = false;
+    resetZoom();
 }
 
 // Set generating state
@@ -150,37 +86,19 @@ function setGenerating(on) {
 
 /**
  * Generate a single image - reusable core function for both single and batch generation
- * @param {string} prompt - The prompt text
- * @param {Object} config - Generation configuration
- * @param {string} config.model - Model ID
- * @param {string} [config.ratio] - Aspect ratio
- * @param {string} [config.resolution] - Resolution (1K/2K/4K)
- * @param {number} [config.thinkingBudget] - Thinking budget (-1 for auto, 0 for off)
- * @param {boolean} [config.searchEnabled] - Enable Google Search
- * @param {Array} [refImagesData] - Reference images array [{id, data}]
- * @param {AbortSignal} [signal] - AbortController signal
- * @returns {Promise<string>} - Generated image as data URL
  */
 export async function generateSingleImage(prompt, config, refImagesData = [], signal = null) {
-    // Debug: log incoming refs
-    console.log(`[Generation] generateSingleImage called with ${refImagesData?.length || 0} refs`);
-
     // Build user message parts
     const userParts = [];
     if (refImagesData && refImagesData.length > 0) {
-        refImagesData.forEach((img, i) => {
+        refImagesData.forEach((img) => {
             const match = img.data?.match(/^data:(.+);base64,(.+)$/);
             if (match) {
                 userParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
-                console.log(`[Generation] Added ref image ${i + 1}: ${match[1]}`);
-            } else {
-                console.warn(`[Generation] Ref image ${i + 1} has invalid data format`);
             }
         });
     }
     userParts.push({ text: prompt });
-
-    console.log(`[Generation] Built ${userParts.length} parts (${userParts.length - 1} images + 1 text)`);
 
     const userContent = { role: 'user', parts: userParts };
 
@@ -197,7 +115,6 @@ export async function generateSingleImage(prompt, config, refImagesData = [], si
         } else if (config.thinkingBudget > 0) {
             genConfig.thinkingConfig = { thinkingBudget: config.thinkingBudget };
         }
-        // -1 = auto, don't set config
     }
 
     const body = { contents: [userContent], generationConfig: genConfig };
@@ -206,7 +123,6 @@ export async function generateSingleImage(prompt, config, refImagesData = [], si
         body.tools = [{ google_search: {} }];
     }
 
-    // Add safety settings if provided
     if (config.safetySettings && config.safetySettings.length > 0) {
         body.safetySettings = config.safetySettings;
     }
@@ -247,9 +163,6 @@ export function getCurrentConfig() {
     };
 }
 
-/**
- * Get safety settings from UI
- */
 function getSafetySettings() {
     const $ = id => document.getElementById(id);
     const settings = [];
@@ -259,40 +172,24 @@ function getSafetySettings() {
     const sexuallyExplicit = $('safetySexuallyExplicit')?.value;
     const dangerous = $('safetyDangerous')?.value;
 
-    if (harassment) {
-        settings.push({ category: 'HARM_CATEGORY_HARASSMENT', threshold: harassment });
-    }
-    if (hateSpeech) {
-        settings.push({ category: 'HARM_CATEGORY_HATE_SPEECH', threshold: hateSpeech });
-    }
-    if (sexuallyExplicit) {
-        settings.push({ category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: sexuallyExplicit });
-    }
-    if (dangerous) {
-        settings.push({ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: dangerous });
-    }
+    if (harassment) settings.push({ category: 'HARM_CATEGORY_HARASSMENT', threshold: harassment });
+    if (hateSpeech) settings.push({ category: 'HARM_CATEGORY_HATE_SPEECH', threshold: hateSpeech });
+    if (sexuallyExplicit) settings.push({ category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: sexuallyExplicit });
+    if (dangerous) settings.push({ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: dangerous });
 
     return settings;
 }
 
-// Main generate function - each call is a fresh start (no conversation history)
+// Main generate function
 export async function generate() {
     const el = getCachedElements();
 
-    // Validation
-    if (authMode === 'apikey') {
-        if (!el.apiKey.value) return showToast('Enter API key');
-    } else if (authMode === 'vertex') {
-        if (!serviceAccount) return showToast('Load service account');
-        if (!el.projectId.value) return showToast('Enter project ID');
-    }
+    if (!el.apiKey.value) return showToast('Enter API key');
     if (!el.modelSelect.value) return showToast('Select model');
     if (!el.prompt.value.trim()) return showToast('Enter prompt');
 
     abortController = new AbortController();
-    generationStartTime = Date.now();
     setGenerating(true);
-    showTimeEstimate();
 
     try {
         const config = getCurrentConfig();
@@ -304,55 +201,34 @@ export async function generate() {
         );
 
         currentImg = result.imageData;
+        currentFilename = null;
         setCurrentImgRef(currentImg);
 
         el.resultImg.src = currentImg;
         el.resultImg.classList.remove('hidden');
         el.placeholder.classList.add('hidden');
         el.imageBox.classList.add('has-image');
-        el.iterateBtn.disabled = el.downloadBtn.disabled = el.copyBtn.disabled = false;
-        el.regenerateBtn.disabled = false;
-        el.clearOutputBtn.disabled = false;
+        el.iterateBtn.disabled = false;
+        el.deleteBtn.disabled = false;
         resetZoom();
 
         // Handle grounding info
         if (result.grounding?.webSearchQueries?.length) {
-            el.groundingInfo.innerHTML = '🔍 ' + result.grounding.webSearchQueries.join(', ');
+            el.groundingInfo.innerHTML = result.grounding.webSearchQueries.join(', ');
             el.groundingInfo.classList.remove('hidden');
         }
 
-        // Record time and update stats
-        if (generationStartTime) {
-            recordGenerationTime(Date.now() - generationStartTime);
-        }
-        generationCount++;
-        totalTokensUsed += estimateTokens(el.prompt.value, refImages.length);
-        updateStats();
-
         saveLastModel();
 
-        // Save to filesystem and/or history
+        // Save to filesystem
         const dirInfo = getDirectoryInfo();
-        const refsUsed = refImages.length > 0 ? refImages.map(r => ({ id: r.id, data: r.data })) : null;
         if (dirInfo.isSet) {
-            // Filesystem mode: save to folder + thumbnail-only history
             try {
                 const saveResult = await saveImageToFilesystem(currentImg, el.prompt.value, 0);
-                await saveToHistoryThumbnailOnly(currentImg, el.prompt.value, el.modelSelect.value, saveResult.filename, refsUsed);
-
-                if (saveResult.method === 'filesystem') {
-                    console.log('Saved to filesystem:', saveResult.filename);
-                } else {
-                    console.log('Downloaded (fallback):', saveResult.filename);
-                }
+                currentFilename = saveResult.filename;
             } catch (e) {
                 console.error('Filesystem save failed:', e);
-                // Fallback to full history save
-                saveToHistory(currentImg, el.prompt.value, el.modelSelect.value, refsUsed);
             }
-        } else {
-            // Legacy mode: save full image to history
-            saveToHistory(currentImg, el.prompt.value, el.modelSelect.value, refsUsed);
         }
 
         playNotificationSound();
@@ -373,21 +249,12 @@ export async function generate() {
     } finally {
         setGenerating(false);
         abortController = null;
-        generationStartTime = null;
-        el.timeEstimate?.classList.add('hidden');
     }
 }
 
 // Cancel generation
 export function cancelGeneration() {
     if (abortController) abortController.abort();
-}
-
-// Regenerate (same prompt)
-export function regenerate() {
-    const el = getCachedElements();
-    if (!el.prompt.value.trim()) return;
-    generate();
 }
 
 // Iterate (add current image to references)
@@ -403,48 +270,19 @@ export function iterate() {
     showToast('Added to references');
 }
 
-// Download current image
-export async function download() {
-    if (!currentImg) return;
-    const pngDataUrl = await ensurePngDataUrl(currentImg);
-    const a = document.createElement('a');
-    a.href = pngDataUrl;
-    a.download = 'nano-banana-' + Date.now() + '.png';
-    a.click();
-}
-
-// Copy current image to clipboard
-export async function copyImg() {
-    if (!currentImg) return;
-    try {
-        // ClipboardItem only supports image/png in most browsers
-        // Convert to PNG using canvas
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = currentImg;
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        showToast('Copied!');
-    } catch (e) {
-        console.error('Copy failed:', e);
-        showToast('Copy failed');
-    }
-}
-
-// Clear output
-export function clearOutput() {
+// Delete current image from filesystem and clear display
+export async function deleteCurrentImage() {
     if (!currentImg) return;
     const el = getCachedElements();
+
+    // Delete from filesystem if we have a filename
+    if (currentFilename) {
+        await deleteFromFilesystem(currentFilename);
+    }
+
+    // Clear display
     currentImg = null;
+    currentFilename = null;
     setCurrentImgRef(null);
     el.resultImg.src = '';
     el.resultImg.classList.add('hidden');
@@ -453,35 +291,31 @@ export function clearOutput() {
     el.imageBox.classList.remove('has-image', 'is-zoomed');
     el.error.classList.add('hidden');
     el.groundingInfo.classList.add('hidden');
-    el.iterateBtn.disabled = el.downloadBtn.disabled = el.copyBtn.disabled = true;
-    el.regenerateBtn.disabled = true;
-    el.clearOutputBtn.disabled = true;
+    el.iterateBtn.disabled = true;
+    el.deleteBtn.disabled = true;
     resetZoom();
-    showToast('Output cleared');
+    showToast('Deleted');
 }
 
 // Clear all: refs, prompt, and output
 export function clearAll() {
     const el = getCachedElements();
 
-    // Clear reference images (without undo toast)
     if (typeof window.clearRefsQuiet === 'function') {
         window.clearRefsQuiet();
     } else {
-        // Fallback: directly clear refs
         import('./references.js').then(m => {
             m.setRefImages([]);
             m.renderRefs();
         });
     }
 
-    // Clear prompt
     el.prompt.value = '';
     import('./ui.js').then(m => m.updateCharCounter());
 
-    // Clear output if any
     if (currentImg) {
         currentImg = null;
+        currentFilename = null;
         setCurrentImgRef(null);
         el.resultImg.src = '';
         el.resultImg.classList.add('hidden');
@@ -490,24 +324,18 @@ export function clearAll() {
         el.imageBox.classList.remove('has-image', 'is-zoomed');
         el.error.classList.add('hidden');
         el.groundingInfo.classList.add('hidden');
-        el.iterateBtn.disabled = el.downloadBtn.disabled = el.copyBtn.disabled = true;
-        el.regenerateBtn.disabled = true;
-        el.clearOutputBtn.disabled = true;
+        el.iterateBtn.disabled = true;
+        el.deleteBtn.disabled = true;
         resetZoom();
     }
 
-    // Persist cleared state
     import('./persistence.js').then(m => m.persistAllInputs());
-
     showToast('All cleared');
 }
 
 // Make functions globally available for HTML onclick handlers
 window.generate = generate;
 window.cancelGeneration = cancelGeneration;
-window.regenerate = regenerate;
 window.iterate = iterate;
-window.download = download;
-window.copyImg = copyImg;
-window.clearOutput = clearOutput;
+window.deleteCurrentImage = deleteCurrentImage;
 window.clearAll = clearAll;

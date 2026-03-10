@@ -1,6 +1,6 @@
 /**
  * Saved Prompts Module
- * Save, load, delete prompts using IndexedDB
+ * Save, load, delete prompts with nicknames using IndexedDB
  */
 
 import { getDB } from './history.js';
@@ -33,7 +33,7 @@ export async function loadSavedPrompts() {
     });
 }
 
-// Save current prompt to IndexedDB
+// Save current prompt to IndexedDB with nickname
 export function saveCurrentPrompt() {
     const db = getDB();
     const promptText = $('prompt').value.trim();
@@ -54,10 +54,16 @@ export function saveCurrentPrompt() {
         return;
     }
 
+    // Ask for a nickname
+    const defaultName = promptText.slice(0, 30).trim();
+    const name = prompt('Name this prompt:', defaultName);
+    if (name === null) return; // User cancelled
+
     const tx = db.transaction('savedPrompts', 'readwrite');
     tx.objectStore('savedPrompts').add({
         id: 'prompt-' + Date.now(),
         text: promptText,
+        name: (name || defaultName).trim(),
         createdAt: Date.now()
     });
 
@@ -92,11 +98,43 @@ export function deletePrompt(id, event) {
     };
 }
 
+// Rename a saved prompt
+export function renamePrompt(id, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+
+    const db = getDB();
+    if (!db) return;
+
+    const p = savedPrompts.find(p => p.id === id);
+    if (!p) return;
+
+    const newName = prompt('Rename prompt:', p.name || p.text.slice(0, 30));
+    if (newName === null || !newName.trim()) return;
+
+    const tx = db.transaction('savedPrompts', 'readwrite');
+    const store = tx.objectStore('savedPrompts');
+    store.get(id).onsuccess = e => {
+        const item = e.target.result;
+        if (item) {
+            item.name = newName.trim();
+            store.put(item);
+        }
+    };
+
+    tx.oncomplete = () => {
+        loadSavedPrompts().then(() => renderPromptsDropdown());
+        showToast('Renamed');
+    };
+}
+
 // Use a saved prompt (load into textarea)
 export function usePrompt(id) {
-    const prompt = savedPrompts.find(p => p.id === id);
-    if (prompt) {
-        $('prompt').value = prompt.text;
+    const p = savedPrompts.find(p => p.id === id);
+    if (p) {
+        $('prompt').value = p.text;
         $('prompt').dispatchEvent(new Event('input'));
         closePromptsDropdown();
         showToast('Prompt loaded');
@@ -113,20 +151,17 @@ export function togglePromptsDropdown() {
     }
 }
 
-// Open dropdown
 function openPromptsDropdown() {
     renderPromptsDropdown();
     $('promptsDropdown').classList.remove('hidden');
     dropdownOpen = true;
 }
 
-// Close dropdown
 export function closePromptsDropdown() {
     $('promptsDropdown').classList.add('hidden');
     dropdownOpen = false;
 }
 
-// Check if dropdown is open
 export function isDropdownOpen() {
     return dropdownOpen;
 }
@@ -144,15 +179,21 @@ function renderPromptsDropdown() {
 
     emptyMsg.classList.add('hidden');
     list.innerHTML = savedPrompts.map(p => {
-        const truncated = p.text.length > 50 ? p.text.slice(0, 50) + '...' : p.text;
+        const displayName = escapeHtml(p.name || p.text.slice(0, 50));
+        const subtitle = escapeHtml(p.text.length > 60 ? p.text.slice(0, 60) + '...' : p.text);
         return '<div class="dropdown-item" onclick="usePrompt(\'' + p.id + '\')">' +
-            '<span class="dropdown-item-text">' + escapeHtml(truncated) + '</span>' +
+            '<div class="dropdown-item-content">' +
+            '<span class="dropdown-item-name">' + displayName + '</span>' +
+            (p.name ? '<span class="dropdown-item-subtitle">' + subtitle + '</span>' : '') +
+            '</div>' +
+            '<div class="dropdown-item-actions">' +
+            '<button class="dropdown-item-rename" onclick="renamePrompt(\'' + p.id + '\', event)" title="Rename">&#x270E;</button>' +
             '<button class="dropdown-item-delete" onclick="deletePrompt(\'' + p.id + '\', event)" title="Delete">&times;</button>' +
+            '</div>' +
             '</div>';
     }).join('');
 }
 
-// Update the saved prompts count badge
 function updatePromptsCount() {
     const badge = $('savedPromptsCount');
     if (badge) {
@@ -161,7 +202,6 @@ function updatePromptsCount() {
     }
 }
 
-// Escape HTML to prevent XSS
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -171,6 +211,7 @@ function escapeHtml(text) {
 // Make functions globally available for HTML onclick handlers
 window.saveCurrentPrompt = saveCurrentPrompt;
 window.deletePrompt = deletePrompt;
+window.renamePrompt = renamePrompt;
 window.usePrompt = usePrompt;
 window.togglePromptsDropdown = togglePromptsDropdown;
 window.closePromptsDropdown = closePromptsDropdown;

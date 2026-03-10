@@ -117,26 +117,6 @@ export async function restoreDirectoryHandle() {
 }
 
 /**
- * Request permission for stored handle (must be called from user gesture)
- */
-export async function requestDirectoryPermission() {
-    if (!directoryHandle) return false;
-
-    try {
-        const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
-        if (permission === 'granted') {
-            updateDirectoryUI();
-            showToast(`Output folder: ${directoryHandle.name}`);
-            return true;
-        }
-        return false;
-    } catch (e) {
-        console.error('Permission request failed:', e);
-        return false;
-    }
-}
-
-/**
  * Clear directory selection
  */
 export async function clearDirectorySelection() {
@@ -173,12 +153,28 @@ export async function hasWritePermission() {
 }
 
 /**
+ * Detect MIME type from a data URL
+ */
+function getMimeType(dataUrl) {
+    const match = dataUrl.match(/^data:(image\/\w+)/);
+    return match ? match[1] : 'image/png';
+}
+
+/**
+ * Get file extension for MIME type
+ */
+function getExtension(mimeType) {
+    return mimeType === 'image/jpeg' ? '.jpg' : '.png';
+}
+
+/**
  * Generate a meaningful filename from prompt
  * @param {string} prompt - The prompt text
  * @param {number} variationIndex - Variation index (0-based)
  * @param {string} batchName - Optional batch name prefix
+ * @param {string} mimeType - Image MIME type (default: image/png)
  */
-export function generateFilename(prompt, variationIndex = 0, batchName = '') {
+export function generateFilename(prompt, variationIndex = 0, batchName = '', mimeType = 'image/png') {
     // Sanitize batch name if provided
     const batchPrefix = batchName
         ? batchName
@@ -210,69 +206,32 @@ export function generateFilename(prompt, variationIndex = 0, batchName = '') {
     // Variation suffix
     const variation = variationIndex > 0 ? `_v${variationIndex + 1}` : '';
 
-    return `${batchPrefix}${snippet}_${timestamp}${variation}.png`;
+    const ext = getExtension(mimeType);
+    return `${batchPrefix}${snippet}_${timestamp}${variation}${ext}`;
 }
 
 /**
- * Convert a blob to PNG if it isn't already.
- * @param {Blob} blob
- * @returns {Promise<Blob>} PNG blob
- */
-function ensurePngBlob(blob) {
-    if (blob.type === 'image/png') return Promise.resolve(blob);
-    return new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            URL.revokeObjectURL(url);
-            canvas.toBlob(pngBlob => pngBlob ? resolve(pngBlob) : reject(new Error('PNG conversion failed')), 'image/png');
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image for PNG conversion')); };
-        img.src = url;
-    });
-}
-
-/**
- * Convert a data URL to a PNG data URL if it isn't already.
- * @param {string} dataUrl
- * @returns {Promise<string>} PNG data URL
- */
-export async function ensurePngDataUrl(dataUrl) {
-    if (dataUrl.startsWith('data:image/png')) return dataUrl;
-    const resp = await fetch(dataUrl);
-    const blob = await ensurePngBlob(await resp.blob());
-    return new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-    });
-}
-
-/**
- * Save image to filesystem
+ * Save image to filesystem (preserves original format)
  * @param {string} imageDataUrl - The image data URL
  * @param {string} prompt - The prompt text
  * @param {number} variationIndex - Variation index (0-based)
  * @param {string} batchName - Optional batch name prefix
  */
 export async function saveImageToFilesystem(imageDataUrl, prompt, variationIndex = 0, batchName = '') {
+    const mimeType = getMimeType(imageDataUrl);
+
     // Fallback: trigger browser download
     if (!directoryHandle || !await hasWritePermission()) {
-        return triggerDownload(imageDataUrl, prompt, variationIndex, batchName);
+        return triggerDownload(imageDataUrl, prompt, variationIndex, batchName, mimeType);
     }
 
     try {
-        const filename = generateFilename(prompt, variationIndex, batchName);
+        const filename = generateFilename(prompt, variationIndex, batchName, mimeType);
         const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
 
-        // Convert data URL to blob, ensuring PNG format
+        // Convert data URL to blob — save in original format (no conversion)
         const response = await fetch(imageDataUrl);
-        const rawBlob = await response.blob();
-        const blob = await ensurePngBlob(rawBlob);
+        const blob = await response.blob();
 
         // Write to file
         const writable = await fileHandle.createWritable();
@@ -305,11 +264,10 @@ export async function saveImageToFilesystem(imageDataUrl, prompt, variationIndex
 /**
  * Fallback: trigger browser download
  */
-async function triggerDownload(imageDataUrl, prompt, variationIndex, batchName = '') {
-    const filename = generateFilename(prompt, variationIndex, batchName);
-    const pngDataUrl = await ensurePngDataUrl(imageDataUrl);
+function triggerDownload(imageDataUrl, prompt, variationIndex, batchName = '', mimeType = 'image/png') {
+    const filename = generateFilename(prompt, variationIndex, batchName, mimeType);
     const a = document.createElement('a');
-    a.href = pngDataUrl;
+    a.href = imageDataUrl;
     a.download = filename;
     a.click();
 
@@ -319,30 +277,6 @@ async function triggerDownload(imageDataUrl, prompt, variationIndex, batchName =
         method: 'download',
         directory: null
     };
-}
-
-/**
- * Load image from filesystem
- */
-export async function loadImageFromFilesystem(filename) {
-    if (!directoryHandle || !await hasWritePermission()) {
-        throw new Error('No directory access');
-    }
-
-    try {
-        const fileHandle = await directoryHandle.getFileHandle(filename);
-        const file = await fileHandle.getFile();
-
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-        });
-    } catch (e) {
-        console.error('Failed to load image:', e);
-        throw e;
-    }
 }
 
 /**
@@ -363,44 +297,6 @@ export async function deleteFromFilesystem(filename) {
         }
         return false;
     }
-}
-
-/**
- * Check if a file exists in the filesystem
- */
-export async function fileExistsInFilesystem(filename) {
-    if (!directoryHandle || !filename) {
-        return false;
-    }
-
-    try {
-        await directoryHandle.getFileHandle(filename);
-        return true;
-    } catch (e) {
-        // NotFoundError means file doesn't exist
-        return false;
-    }
-}
-
-/**
- * Get list of all image files in the directory
- */
-export async function listFilesInDirectory() {
-    if (!directoryHandle || !await hasWritePermission()) {
-        return [];
-    }
-
-    const files = [];
-    try {
-        for await (const entry of directoryHandle.values()) {
-            if (entry.kind === 'file' && entry.name.match(/\.(png|jpg|jpeg|webp|gif)$/i)) {
-                files.push(entry.name);
-            }
-        }
-    } catch (e) {
-        console.error('Failed to list directory:', e);
-    }
-    return files;
 }
 
 /**
@@ -433,4 +329,3 @@ function updateDirectoryUI() {
 // Export for global access
 window.selectOutputDirectory = selectOutputDirectory;
 window.clearDirectorySelection = clearDirectorySelection;
-window.requestDirectoryPermission = requestDirectoryPermission;

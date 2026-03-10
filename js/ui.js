@@ -139,7 +139,7 @@ export function toggleCollapsible(id) {
 
 // Restore collapsible states from localStorage
 export function restoreCollapsibleStates() {
-    ['aboutCollapsible', 'authCollapsible', 'advancedCollapsible', 'settingsCollapsible'].forEach(id => {
+    ['authCollapsible', 'advancedCollapsible', 'settingsCollapsible', 'safetyCollapsible'].forEach(id => {
         const el = $(id);
         if (el && localStorage.getItem('collapsed_' + id) === 'true') {
             el.classList.add('collapsed');

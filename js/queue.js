@@ -3,12 +3,11 @@
  * Multi-generation queue management with persistence
  */
 
-import { DEFAULT_QUEUE_DELAY_MS, MAX_QUEUE_ITEMS, MAX_VARIATIONS_PER_PROMPT, QUEUE_STORAGE_KEY } from './config.js';
-import { generateSingleImage, getCurrentConfig } from './generation.js';
-import { saveToHistoryThumbnailOnly, saveQueueRefsMultiple, loadQueueRefsMultiple, deleteQueueRefsMultiple, clearAllQueueRefs } from './history.js';
+import { DEFAULT_QUEUE_DELAY_MS, MAX_QUEUE_ITEMS, QUEUE_STORAGE_KEY } from './config.js';
+import { generateSingleImage, showImageResult } from './generation.js';
+import { saveQueueRefsMultiple, loadQueueRefsMultiple, deleteQueueRefsMultiple, clearAllQueueRefs } from './history.js';
 import { saveImageToFilesystem, getDirectoryInfo } from './filesystem.js';
 import { showToast, haptic, playNotificationSound, showConfirmDialog } from './ui.js';
-import { refImages } from './references.js';
 
 // Queue item statuses
 export const QueueStatus = {
@@ -358,21 +357,14 @@ async function processQueue() {
                 }
             }
 
-            // Save to history (thumbnail only)
-            const refsUsed = item.refImages && item.refImages.length > 0 ? item.refImages : null;
-            await saveToHistoryThumbnailOnly(
-                result.imageData,
-                item.prompt,
-                item.config.model,
-                filename,
-                refsUsed
-            );
-
             // Mark completed
             item.status = QueueStatus.COMPLETED;
             item.completedAt = Date.now();
             item.filename = filename;
             queueState.completedCount++;
+
+            // Show the last generated image in the right panel
+            showImageResult(result.imageData, filename);
 
             // Track generation time for ETA calculation
             const generationTime = item.completedAt - item.startedAt;

@@ -16,125 +16,13 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>🍌 Gemini ImageGen 🍌</h1>
-      <button class="btn-secondary" onclick="toggleHistory()">History</button>
+      <h1>NBPI</h1>
     </div>
     
     <!-- Desktop Layout Wrapper -->
     <div class="desktop-layout">
       <!-- Left Panel: Controls -->
       <div class="left-panel">
-        <!-- About / Features (Collapsible) -->
-        <div class="collapsible collapsed" id="aboutCollapsible">
-          <div class="collapsible-header" onclick="toggleCollapsible('aboutCollapsible')">
-            <label>About & Features</label>
-            <span class="collapsible-chevron">▼</span>
-          </div>
-          <div class="collapsible-body" style="font-size:0.75rem;color:#888;line-height:1.6;">
-            <div style="margin-bottom:8px;color:#eab308;font-weight:600;">NBPI ImageGen v2.0</div>
-            <div style="margin-bottom:12px;">A feature-rich Gemini image generation client with dual auth support.</div>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">🔐 Authentication</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>API Key authentication</li>
-                <li>Vertex AI with Service Account JSON</li>
-                <li>Auto-refresh tokens & retry on auth errors</li>
-                <li>API key visibility toggle (👁️)</li>
-              </ul>
-            </details>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">🖼️ Image Generation</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>All Gemini image models</li>
-                <li>Configurable aspect ratio with visual preview</li>
-                <li>1K / 2K / 4K resolution selection</li>
-                <li>Thinking mode with adjustable budget</li>
-                <li>Google Search grounding</li>
-                <li>Auto-retry with exponential backoff</li>
-                <li>Generation time estimation</li>
-                <li>Regenerate button for quick iterations</li>
-              </ul>
-            </details>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">📷 Reference Images</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>Up to 14 reference images</li>
-                <li>Auto-compression on import (max 2048px)</li>
-                <li>Numbered ordering badges</li>
-                <li>Paste from clipboard support</li>
-                <li>Iterate: add generated image to refs</li>
-                <li>Undo clear with 5-second restore</li>
-              </ul>
-            </details>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">📜 History & Favorites</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>IndexedDB persistent storage</li>
-                <li>Thumbnail generation for fast loading</li>
-                <li>Infinite scroll pagination</li>
-                <li>Star/favorite system</li>
-                <li>Filter by favorites</li>
-                <li>Clear all (preserves favorites)</li>
-                <li>Delete individual items</li>
-                <li>Load prompt from history</li>
-              </ul>
-            </details>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">🔍 Image Viewing</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>Pinch-to-zoom (mobile)</li>
-                <li>Mouse wheel zoom (desktop)</li>
-                <li>Pan when zoomed</li>
-                <li>Double-tap/click to reset</li>
-                <li>Fullscreen modal with zoom controls</li>
-                <li>Download & copy to clipboard</li>
-              </ul>
-            </details>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">📱 Mobile Features</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>Pinch-to-zoom on images</li>
-                <li>Double-tap to zoom/reset</li>
-                <li>Haptic feedback (vibration)</li>
-                <li>Touch-optimized UI</li>
-              </ul>
-            </details>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">💾 Persistence</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>All inputs auto-saved</li>
-                <li>Model memory (last used)</li>
-                <li>Collapsible section states</li>
-                <li>Settings preferences</li>
-                <li>Reference images preserved</li>
-              </ul>
-            </details>
-
-            <details style="margin-bottom:8px;">
-              <summary style="cursor:pointer;color:#aaa;">📊 Stats & Feedback</summary>
-              <ul style="margin:8px 0 0 16px;padding:0;">
-                <li>Generation counter (session)</li>
-                <li>Estimated token usage</li>
-                <li>Prompt character counter</li>
-                <li>Sound notification on complete</li>
-                <li>User-friendly error messages</li>
-                <li>Smooth scroll to result</li>
-              </ul>
-            </details>
-
-            <div style="margin-top:12px;padding-top:8px;border-top:1px solid #333;color:#555;font-size:0.65rem;">
-              Built with vanilla HTML/CSS/JS • No build tools required
-            </div>
-          </div>
-        </div>
-        
         <!-- Authentication -->
         <div class="collapsible" id="authCollapsible">
           <div class="collapsible-header" onclick="toggleCollapsible('authCollapsible')">
@@ -142,39 +30,19 @@
             <span class="collapsible-chevron">▼</span>
           </div>
           <div class="collapsible-body">
-            <div class="auth-tabs">
-              <div class="auth-tab active" data-mode="apikey" onclick="switchAuthMode('apikey')">API Key</div>
-              <div class="auth-tab" data-mode="vertex" onclick="switchAuthMode('vertex')">Vertex AI</div>
-            </div>
-            <div class="auth-content">
-              <!-- API Key Panel -->
-              <div class="auth-panel active" id="apikeyPanel">
-                <div class="api-key-row">
-                  <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
-                  <button class="btn-toggle-visibility" onclick="toggleApiKeyVisibility()" title="Show/Hide">👁️</button>
-                </div>
-              </div>
-              <!-- Vertex AI Panel -->
-              <div class="auth-panel" id="vertexPanel">
-                <input type="file" id="saFileInput" class="file-hidden" accept=".json" onchange="handleSAFile(this.files[0])">
-                <div class="file-drop-zone" id="saDropZone" onclick="document.getElementById('saFileInput').click()">
-                  <div>📁 Drop service account JSON here</div>
-                </div>
-                <div class="sa-info" id="saInfo"></div>
-                <!-- Hidden fields - auto-populated from service account -->
-                <input type="hidden" id="projectId">
-                <input type="hidden" id="vertexLocation" value="global">
-              </div>
+            <div class="api-key-row">
+              <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
+              <button class="btn-toggle-visibility" onclick="toggleApiKeyVisibility()" title="Show/Hide">👁️</button>
             </div>
           </div>
         </div>
-        
+
         <!-- Model Selection -->
         <div>
           <label>Model</label>
           <div class="model-row">
             <select id="modelSelect">
-              <option value="">Enter credentials to load models...</option>
+              <option value="">Enter API key to load models...</option>
             </select>
             <button class="btn-refresh" id="refreshBtn" onclick="refreshModels()">⟳</button>
           </div>
@@ -186,8 +54,6 @@
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <label>Reference Images <span id="refCount"></span> <span style="color:#666;font-size:0.6rem;">(max 14)</span></label>
             <div class="ref-actions">
-              <button class="btn-secondary btn-sm" id="loadRefSetBtn" onclick="showRefSetsMenu()" title="Load saved set">Load</button>
-              <button class="btn-secondary btn-sm" onclick="saveCurrentRefsAsSet()" title="Save current refs as set">Save</button>
               <button class="btn-secondary btn-sm" id="clearRefsBtn" onclick="clearRefs()">Clear</button>
             </div>
           </div>
@@ -358,19 +224,16 @@
             <div class="safety-note">
               None = no filtering, Low = block high probability only, Medium = default, High = strictest
             </div>
-            <button class="btn-secondary" id="saveSettingsBtn" onclick="saveSettings()" style="margin-top: 12px; width: 100%;">Save Settings</button>
           </div>
         </div>
         
-        <!-- Generate Button -->
+        <!-- Action Buttons -->
         <div style="display:flex;gap:8px;">
-          <button class="btn-primary" id="generateBtn" onclick="generate()" style="flex:1;">Generate Image</button>
+          <button class="btn-primary" id="generateBtn" onclick="generate()" style="flex:1;">Quick Generate</button>
+          <button class="btn-primary" id="batchBtn" onclick="handleBatchButtonClick()" style="flex:1;">Batch Setup</button>
           <button class="btn-secondary" id="clearAllBtn" onclick="clearAll()" title="Clear refs, prompt & output">Clear</button>
         </div>
-        <button class="btn-cancel hidden" id="cancelBtn" onclick="cancelGeneration()">Cancel Generation</button>
-
-        <!-- Batch Generate Button -->
-        <button class="btn-batch" id="batchBtn" onclick="handleBatchButtonClick()">Batch Generate</button>
+        <button class="btn-cancel hidden" id="cancelBtn" onclick="cancelGeneration()">Cancel</button>
 
         <!-- Output Folder Section -->
         <div class="output-folder-section">
@@ -411,16 +274,7 @@
         
         <div class="actions">
           <button class="btn-iterate" id="iterateBtn" onclick="iterate()" disabled>Iterate</button>
-          <button class="btn-secondary" id="regenerateBtn" onclick="regenerate()" disabled>🔄</button>
-          <button class="btn-secondary" id="clearOutputBtn" onclick="clearOutput()" disabled title="Clear Output">🗑</button>
-          <button class="btn-secondary" id="downloadBtn" onclick="download()" disabled>Download</button>
-          <button class="btn-secondary" id="copyBtn" onclick="copyImg()" disabled>Copy</button>
-        </div>
-        
-        <!-- Stats Bar -->
-        <div class="stats-bar">
-          <div class="stat-item">🖼️ <span class="stat-value" id="genCountStat">0</span> generated</div>
-          <div class="stat-item">📊 ~<span class="stat-value" id="tokenStat">0</span> tokens</div>
+          <button class="btn-cancel" id="deleteBtn" onclick="deleteCurrentImage()" disabled>Delete</button>
         </div>
       </div>
       <!-- End Right Panel -->
@@ -434,35 +288,6 @@
     <button onclick="undoClearRefs()">Undo</button>
   </div>
 
-  <!-- Audio for notification sound -->
-  <audio id="notificationSound" preload="auto"></audio>
-  
-  <!-- Overlay -->
-  <div class="overlay" id="overlay" onclick="toggleHistory()"></div>
-  
-  <!-- History Panel -->
-  <div class="history-panel" id="historyPanel">
-    <div class="history-header">
-      <h2>History</h2>
-      <button class="close-btn" onclick="toggleHistory()">×</button>
-    </div>
-    <div class="history-filter">
-      <button class="filter-btn active" id="filterAll" onclick="setHistoryFilter('all')">All</button>
-      <button class="filter-btn" id="filterFavorites" onclick="setHistoryFilter('favorites')">★ Favorites</button>
-    </div>
-    <div class="history-size-control">
-      <label for="historyColumns">Size</label>
-      <input type="range" id="historyColumns" min="1" max="5" value="2" oninput="setHistoryColumns(this.value)">
-    </div>
-    <div class="history-list" id="historyList">
-      <div class="history-empty">No images yet</div>
-    </div>
-    <div class="history-actions">
-      <button class="btn-secondary" onclick="syncHistoryWithFilesystem()" title="Remove entries for deleted files">Sync</button>
-      <button class="btn-secondary" onclick="clearHistory()">Clear All (keeps ★)</button>
-    </div>
-  </div>
-  
   <!-- Toast -->
   <div class="toast hidden" id="toast"></div>
   
@@ -479,21 +304,6 @@
       <button onclick="fsZoomIn()" title="Zoom In">+</button>
     </div>
     <div class="fullscreen-hint">Scroll to zoom • Drag to pan • Double-click to reset</div>
-  </div>
-  
-  <!-- History Preview Modal -->
-  <div class="preview-modal" id="previewModal" onclick="closePreview(event)">
-    <div class="preview-content" onclick="event.stopPropagation()">
-      <img class="preview-img" id="previewImg" src="" alt="Preview">
-      <div class="preview-prompt" id="previewPrompt"></div>
-      <div class="preview-actions">
-        <button class="btn-primary" onclick="useHistoryItem()">Use All</button>
-        <button class="btn-secondary" onclick="useHistoryPromptOnly()">Use Prompt</button>
-        <button class="btn-secondary" onclick="useHistoryRefs()" id="useRefsBtn" disabled>Use Refs</button>
-        <button class="btn-secondary" onclick="downloadPreview()">Download</button>
-        <button class="btn-secondary" onclick="closePreview()">Close</button>
-      </div>
-    </div>
   </div>
 
   <!-- Fullscreen Prompt Editor Modal -->
