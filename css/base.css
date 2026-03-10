@@ -31,7 +31,7 @@ label {
 }
 
 /* Form Elements */
-input,
+input:not([type="range"]):not([type="checkbox"]),
 textarea,
 select {
     width: 100%;
@@ -45,7 +45,7 @@ select {
     max-width: 100%;
 }
 
-input:focus,
+input:not([type="range"]):not([type="checkbox"]):focus,
 textarea:focus,
 select:focus {
     border-color: var(--border-focus);

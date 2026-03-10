@@ -474,12 +474,34 @@ input:checked+.slider:before {
 
 /* Thinking Row */
 .thinking-row input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
     flex: 1;
     padding: 0;
     height: 6px;
     background: var(--border-default);
     border: none;
     border-radius: 3px;
+    cursor: pointer;
+}
+
+.thinking-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    border: none;
+    cursor: pointer;
+}
+
+.thinking-row input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    border: none;
+    cursor: pointer;
 }
 
 /* Settings Section */
