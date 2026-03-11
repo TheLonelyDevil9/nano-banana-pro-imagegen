@@ -3,7 +3,7 @@
  * LocalStorage save/restore for inputs and settings
  */
 
-import { $, updateThinkingLabel } from './ui.js';
+import { $, updateThinkingLabel, debounce } from './ui.js';
 
 // Persist a single input value
 export function persistInput(key, value) {
@@ -75,6 +75,7 @@ export function setupInputPersistence() {
     $('searchToggle').addEventListener('change', persist);
     $('thinkingToggle').addEventListener('change', persist);
     $('thinkingBudget').addEventListener('input', persist);
+    $('thinkingBudgetNum')?.addEventListener('input', persist);
     $('soundToggle')?.addEventListener('change', persist);
     $('hapticToggle')?.addEventListener('change', persist);
     // Safety settings

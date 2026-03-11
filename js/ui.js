@@ -185,6 +185,8 @@ export function updateAspectPreview() {
 export function updateThinkingLabel() {
     const v = parseInt($('thinkingBudget').value);
     $('thinkingLabel').textContent = v === -1 ? 'Auto' : v === 0 ? 'Off' : v.toLocaleString();
+    const numInput = $('thinkingBudgetNum');
+    if (numInput) numInput.value = v;
 }
 
 // Update placeholder text

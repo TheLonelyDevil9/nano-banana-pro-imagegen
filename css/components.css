@@ -504,6 +504,30 @@ input:checked+.slider:before {
     cursor: pointer;
 }
 
+/* Thinking budget number input */
+.thinking-budget-num {
+    width: 72px;
+    padding: 4px 6px;
+    font-size: 0.75rem;
+    text-align: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    color: var(--text-primary);
+    -moz-appearance: textfield;
+}
+
+.thinking-budget-num::-webkit-outer-spin-button,
+.thinking-budget-num::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.thinking-budget-num:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
 /* Settings Section */
 .settings-row {
     display: flex;

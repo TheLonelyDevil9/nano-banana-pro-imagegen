@@ -55,6 +55,26 @@ async function init() {
     // Thinking budget handler
     $('thinkingBudget').addEventListener('input', updateThinkingLabel);
 
+    // Thinking budget number input -> sync to slider
+    $('thinkingBudgetNum').addEventListener('input', () => {
+        let v = parseInt($('thinkingBudgetNum').value);
+        if (isNaN(v)) return;
+        v = Math.max(-1, Math.min(24576, v));
+        if (v > 0 && v < 128) v = 128;
+        $('thinkingBudget').value = v;
+        updateThinkingLabel();
+    });
+
+    $('thinkingBudgetNum').addEventListener('blur', () => {
+        let v = parseInt($('thinkingBudgetNum').value);
+        if (isNaN(v)) v = -1;
+        v = Math.max(-1, Math.min(24576, v));
+        if (v > 0 && v < 128) v = 128;
+        $('thinkingBudget').value = v;
+        $('thinkingBudgetNum').value = v;
+        updateThinkingLabel();
+    });
+
     // Prompt character counter
     $('prompt').addEventListener('input', updateCharCounter);
 
