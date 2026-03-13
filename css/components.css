@@ -1350,6 +1350,123 @@ input:checked+.slider:before {
     font-style: italic;
 }
 
+/* Per-Box Drop Zone */
+.box-drop-zone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-height: 56px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px dashed var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--bg-base);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+    margin-top: var(--spacing-sm);
+}
+
+.box-drop-zone:hover {
+    border-color: var(--border-hover);
+}
+
+.box-drop-zone.drag-over {
+    border-color: var(--color-primary);
+    background: rgba(234, 179, 8, 0.08);
+}
+
+.box-drop-zone.paste-target {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.25);
+}
+
+.box-drop-zone-placeholder {
+    width: 100%;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: var(--font-size-sm);
+    pointer-events: none;
+    user-select: none;
+}
+
+.box-drop-zone-ref {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+}
+
+.box-drop-zone-ref img {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    border: 1px solid var(--color-primary);
+}
+
+.box-drop-zone-ref .box-ref-remove {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 18px;
+    height: 18px;
+    background: var(--color-error);
+    border: 1.5px solid var(--bg-base);
+    border-radius: var(--radius-full);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+}
+
+.box-drop-zone-ref:hover .box-ref-remove {
+    display: flex;
+}
+
+.box-drop-zone-add {
+    width: 48px;
+    height: 48px;
+    border: 2px dashed var(--border-hover);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 22px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.box-drop-zone-add:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.box-drop-zone-clear {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    padding: 2px var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.box-drop-zone-clear:hover {
+    color: var(--color-error);
+    background: rgba(239, 68, 68, 0.1);
+}
+
 /* Global Settings Section */
 .queue-global-settings {
     background: var(--bg-surface);

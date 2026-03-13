@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased] - 2026-03-14
+
+### Added
+- **Per-Box Drop Zones**: Each batch prompt box now has a visible drop zone for reference images
+  - Drag image files from Explorer directly onto a prompt box to add refs
+  - Clipboard paste (Ctrl+V) targets the last-clicked/focused box with visual indicator
+  - Drop zone shows 48×48 thumbnails of attached refs with hover-to-remove buttons
+  - Click the drop zone or its "+" button to open file picker
+  - "Clear" button to revert a box to global refs
+  - Active paste target highlighted with golden glow border
+  - No conflict with drag-to-reorder (uses separate drag handle)
+
 ## [Unreleased] - 2026-03-13
 
 ### Added

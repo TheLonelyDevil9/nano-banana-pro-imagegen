@@ -24,6 +24,7 @@ let promptBoxes = [];
 let currentBoxForRefs = null;
 let bulkRefMode = false;  // When true, file input adds to selected boxes
 let lastFocusedBoxId = null;  // Track last-focused box for clipboard paste
+let activeDropTargetId = null;  // Track active drop target for paste/drop
 
 // Multi-select state
 let selectedBoxIds = new Set();
@@ -483,6 +484,7 @@ function renderPromptBoxes() {
     container.innerHTML = promptBoxes.map((box, index) => {
         const hasCustomRefs = box.refImages && box.refImages.length > 0;
         const isSelected = selectedBoxIds.has(box.id);
+        const isPasteTarget = activeDropTargetId === box.id;
 
         return `
             <div class="prompt-box ${isSelected ? 'selected' : ''}" data-box-id="${box.id}" draggable="true">
@@ -507,8 +509,22 @@ function renderPromptBoxes() {
                         oninput="updateBoxName('${box.id}', this.value)">
                     <textarea class="prompt-box-textarea"
                         placeholder="Enter your prompt..."
-                        onfocus="setLastFocusedBox('${box.id}')"
+                        onfocus="setActiveDropTarget('${box.id}')"
                         oninput="updateBoxPrompt('${box.id}', this.value)">${escapeHtml(box.prompt)}</textarea>
+                    <div class="box-drop-zone ${isPasteTarget ? 'paste-target' : ''}" data-box-id="${box.id}">
+                        ${hasCustomRefs ? `
+                            ${box.refImages.map(ref => `
+                                <div class="box-drop-zone-ref">
+                                    <img src="${ref.data}" title="Reference image">
+                                    <button class="box-ref-remove" onclick="event.stopPropagation(); removeBoxRef('${box.id}', ${ref.id})" title="Remove">&times;</button>
+                                </div>
+                            `).join('')}
+                            ${box.refImages.length < MAX_REFS ? `<button class="box-drop-zone-add" onclick="event.stopPropagation(); openBoxRefPicker('${box.id}')" title="Add more">+</button>` : ''}
+                            <button class="box-drop-zone-clear" onclick="event.stopPropagation(); clearBoxRefs('${box.id}')" title="Clear all refs">Clear</button>
+                        ` : `
+                            <span class="box-drop-zone-placeholder">Drop, paste, or click to add reference images</span>
+                        `}
+                    </div>
                 </div>
                 <div class="prompt-box-footer">
                     <div class="prompt-box-variations">
@@ -521,25 +537,7 @@ function renderPromptBoxes() {
                             `).join('')}
                         </div>
                     </div>
-                    <div class="prompt-box-refs">
-                        <label>Refs:</label>
-                        ${hasCustomRefs ? `
-                            <div class="prompt-box-refs-thumbs">
-                                ${box.refImages.slice(0, 4).map(ref => `
-                                    <img src="${ref.data}" class="prompt-box-ref-thumb" title="Click to remove" onclick="removeBoxRef('${box.id}', ${ref.id})">
-                                `).join('')}
-                                ${box.refImages.length > 4 ? `<span style="color:var(--text-muted);font-size:0.75rem;">+${box.refImages.length - 4}</span>` : ''}
-                            </div>
-                        ` : `
-                            <span class="prompt-box-refs-info">(using global)</span>
-                        `}
-                        <div class="prompt-box-refs-actions">
-                            <button class="btn-secondary btn-sm" onclick="openBoxRefPicker('${box.id}')">Add</button>
-                            ${hasCustomRefs ? `
-                                <button class="btn-secondary btn-sm" onclick="clearBoxRefs('${box.id}')">Clear</button>
-                            ` : ''}
-                        </div>
-                    </div>
+                    ${!hasCustomRefs ? `<span class="prompt-box-refs-info">Using global refs if enabled</span>` : ''}
                 </div>
             </div>
         `;
@@ -552,6 +550,9 @@ function renderPromptBoxes() {
         setupDragReorder();
         container.dataset.dragSetup = 'true';
     }
+
+    // Setup drop zones for ref images (must run after every render since zones are recreated)
+    setupBoxDropZones();
 }
 
 /**
@@ -616,6 +617,7 @@ export function closeQueueSetup() {
     // Reset sticky defaults and selection when closing modal
     stickyDefaults = { variations: 1, refImages: null };
     selectedBoxIds.clear();
+    activeDropTargetId = null;
     // Clear batch name input
     const batchNameInput = $('batchNameInput');
     if (batchNameInput) {
@@ -1450,6 +1452,126 @@ export function setLastFocusedBox(boxId) {
 }
 
 /**
+ * Set the active drop target (for paste routing + visual indicator)
+ */
+export function setActiveDropTarget(boxId) {
+    lastFocusedBoxId = boxId;
+    if (activeDropTargetId === boxId) return;
+
+    // Remove previous indicator
+    if (activeDropTargetId) {
+        const prevZone = document.querySelector(`.box-drop-zone[data-box-id="${activeDropTargetId}"]`);
+        if (prevZone) prevZone.classList.remove('paste-target');
+    }
+
+    activeDropTargetId = boxId;
+
+    // Add indicator to new target
+    const zone = document.querySelector(`.box-drop-zone[data-box-id="${boxId}"]`);
+    if (zone) zone.classList.add('paste-target');
+}
+
+/**
+ * Get the active drop target box ID (for paste routing from references.js)
+ */
+export function getActiveDropTarget() {
+    return activeDropTargetId;
+}
+
+/**
+ * Setup drag-and-drop handlers on each box's drop zone
+ * Called after every renderPromptBoxes since zones are recreated
+ */
+function setupBoxDropZones() {
+    const zones = document.querySelectorAll('.box-drop-zone');
+
+    zones.forEach(zone => {
+        const boxId = zone.dataset.boxId;
+
+        // Click to open file picker (only when clicking the placeholder or the zone itself, not child buttons)
+        zone.addEventListener('click', e => {
+            if (e.target === zone || e.target.classList.contains('box-drop-zone-placeholder')) {
+                setActiveDropTarget(boxId);
+                openBoxRefPicker(boxId);
+            }
+        });
+
+        // Set as paste target on any interaction
+        zone.addEventListener('mousedown', () => {
+            setActiveDropTarget(boxId);
+        });
+
+        // Drag enter/over — accept image files
+        zone.addEventListener('dragenter', e => {
+            // Ignore box reorder drags (they set text/plain with box ID)
+            if (draggedBoxId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            zone.classList.add('drag-over');
+            setActiveDropTarget(boxId);
+        });
+
+        zone.addEventListener('dragover', e => {
+            if (draggedBoxId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        zone.addEventListener('dragleave', e => {
+            // Only remove if leaving the zone itself (not entering a child)
+            if (!zone.contains(e.relatedTarget)) {
+                zone.classList.remove('drag-over');
+            }
+        });
+
+        // Drop — process image files
+        zone.addEventListener('drop', async e => {
+            zone.classList.remove('drag-over');
+
+            // Ignore box reorder drags
+            if (draggedBoxId) return;
+
+            const files = e.dataTransfer?.files;
+            if (!files || files.length === 0) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (imageFiles.length === 0) return;
+
+            const box = promptBoxes.find(b => b.id === boxId);
+            if (!box) return;
+
+            if (!box.refImages) box.refImages = [];
+
+            let addedCount = 0;
+            for (const file of imageFiles) {
+                if (box.refImages.length >= MAX_REFS) {
+                    showToast(`Maximum ${MAX_REFS} reference images reached`);
+                    break;
+                }
+                try {
+                    const dataUrl = await fileToDataUrl(file);
+                    const compressed = await compressImage(dataUrl);
+                    box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
+                    addedCount++;
+                } catch (err) {
+                    console.error('Error processing dropped file:', err);
+                }
+            }
+
+            if (addedCount > 0) {
+                renderPromptBoxes();
+                const idx = promptBoxes.findIndex(b => b.id === boxId) + 1;
+                showToast(`${addedCount} image${addedCount > 1 ? 's' : ''} added to Prompt ${idx}`);
+            }
+        });
+    });
+}
+
+/**
  * Check if the batch setup modal is currently open
  */
 export function isBatchModalOpen() {
@@ -1462,9 +1584,11 @@ export function isBatchModalOpen() {
  * @param {File[]} imageFiles - Array of image files from clipboard
  */
 export async function pasteRefsToBox(imageFiles) {
-    // Determine target boxes
+    // Determine target boxes — priority: activeDropTarget > selected > lastFocused > first
     let targetBoxIds = [];
-    if (selectedBoxIds.size > 0) {
+    if (activeDropTargetId && promptBoxes.find(b => b.id === activeDropTargetId)) {
+        targetBoxIds = [activeDropTargetId];
+    } else if (selectedBoxIds.size > 0) {
         targetBoxIds = [...selectedBoxIds];
     } else if (lastFocusedBoxId && promptBoxes.find(b => b.id === lastFocusedBoxId)) {
         targetBoxIds = [lastFocusedBoxId];
@@ -1542,3 +1666,4 @@ window.duplicatePromptBox = duplicatePromptBox;
 window.toggleQueueSettings = toggleQueueSettings;
 window.applySettingsToRemaining = applySettingsToRemaining;
 window.setLastFocusedBox = setLastFocusedBox;
+window.setActiveDropTarget = setActiveDropTarget;
