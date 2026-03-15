@@ -449,20 +449,20 @@ function onQueueComplete() {
 
     notifyProgress();
 
-    // Auto-clear completed items after 5s so FAB hides (skip if failures exist for retry)
-    if (failed === 0) {
-        setTimeout(() => {
-            // Guard: don't clear if user started a new queue in the meantime
-            if (queueState.isRunning) return;
-            queueState.items = [];
-            queueState.completedCount = 0;
-            queueState.failedCount = 0;
-            queueState.generationTimes = [];
-            clearAllQueueRefs().catch(() => {});
-            persistQueueState();
-            notifyProgress();
-        }, 5000);
-    }
+    // Auto-clear completed/failed items after delay so FAB hides
+    const clearDelay = failed === 0 ? 5000 : 15000;
+    setTimeout(() => {
+        // Guard: don't clear if user started a new queue or added new items
+        if (queueState.isRunning) return;
+        if (queueState.items.some(i => i.status === QueueStatus.PENDING)) return;
+        queueState.items = [];
+        queueState.completedCount = 0;
+        queueState.failedCount = 0;
+        queueState.generationTimes = [];
+        clearAllQueueRefs().catch(() => {});
+        persistQueueState();
+        notifyProgress();
+    }, clearDelay);
 }
 
 /**
