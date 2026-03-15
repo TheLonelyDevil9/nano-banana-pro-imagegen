@@ -269,7 +269,14 @@
           <button class="btn-secondary" id="clearAllBtn" onclick="clearAll()" title="Clear refs, prompt & output">Clear</button>
         </div>
 
-        <!-- Output Folder Section -->
+        <!-- Output Section -->
+        <div class="output-folder-section">
+          <div class="output-folder-header">
+            <label>Filename Prefix</label>
+            <button class="btn-secondary btn-sm hidden" id="clearPrefixBtn" onclick="document.getElementById('filenamePrefix').value='';this.classList.add('hidden');" style="padding:2px 6px;font-size:11px;">Clear</button>
+          </div>
+          <input type="text" id="filenamePrefix" placeholder="e.g. belle-sitting, scene-forest" spellcheck="false" autocomplete="off" style="width:100%;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-md);color:var(--text-primary);font-size:var(--font-size-md);margin-bottom:8px;">
+        </div>
         <div class="output-folder-section">
           <div class="output-folder-header">
             <label>Output Folder</label>

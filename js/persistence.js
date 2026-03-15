@@ -34,6 +34,7 @@ export function persistAllInputs() {
     persistInput('safetyHateSpeech', $('safetyHateSpeech')?.value);
     persistInput('safetySexuallyExplicit', $('safetySexuallyExplicit')?.value);
     persistInput('safetyDangerous', $('safetyDangerous')?.value);
+    persistInput('filenamePrefix', $('filenamePrefix')?.value || '');
     // authMode and refImages are persisted by their respective modules
 }
 
@@ -66,6 +67,14 @@ export function restoreAllInputs() {
 
     updateThinkingLabel();
     $('thinkingRow').style.display = $('thinkingToggle').checked ? 'block' : 'none';
+
+    // Filename prefix
+    const prefixEl = $('filenamePrefix');
+    if (prefixEl) {
+        prefixEl.value = loadPersistedInput('filenamePrefix', '');
+        const clearBtn = $('clearPrefixBtn');
+        if (clearBtn) clearBtn.classList.toggle('hidden', !prefixEl.value);
+    }
 }
 
 // Setup input persistence listeners
@@ -84,6 +93,15 @@ export function setupInputPersistence() {
     // Safety settings
     ['safetyHarassment', 'safetyHateSpeech', 'safetySexuallyExplicit', 'safetyDangerous']
         .forEach(id => $(id)?.addEventListener('change', persist));
+    // Filename prefix
+    const prefixEl = $('filenamePrefix');
+    if (prefixEl) {
+        prefixEl.addEventListener('input', () => {
+            const clearBtn = $('clearPrefixBtn');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !prefixEl.value);
+            persist();
+        });
+    }
 }
 
 // Save last used model

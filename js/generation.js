@@ -170,10 +170,11 @@ export async function generate() {
 
     const variations = parseInt(el.variations?.value || 1);
     const config = getCurrentConfig();
+    const prefix = $('filenamePrefix')?.value?.trim() || '';
     const { addToQueue, startQueue } = await import('./queue.js');
     const { toggleQueuePanel } = await import('./queueUI.js');
 
-    addToQueue([el.prompt.value], variations, config, refImages, '');
+    addToQueue([el.prompt.value], variations, config, refImages, prefix);
     startQueue();
     toggleQueuePanel(true);
     saveLastModel();

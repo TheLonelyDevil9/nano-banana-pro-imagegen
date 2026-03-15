@@ -13,6 +13,7 @@
 - **Zoom element caching**: Cached fullscreen DOM elements to avoid repeated `getElementById` calls in wheel/touch/mouse event handlers
 - **Queue ref efficiency**: Queue items now share reference image objects instead of shallow-cloning each one per variation (refs are read-only data URLs)
 - **Persistence debounce**: Increased input persistence debounce from 300ms to 1000ms (reduces unnecessary localStorage writes during typing)
+- **Filename prefix on main screen**: New input field lets you set a filename prefix for single generations (same as batch name in Batch Setup). Persisted across sessions
 - **Profile export security**: API key is now stripped from exported profile JSON files
 
 ### Fixed
