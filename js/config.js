@@ -17,6 +17,9 @@ export const MAX_QUEUE_ITEMS = 100;
 export const MAX_VARIATIONS_PER_PROMPT = 10;
 export const QUEUE_STORAGE_KEY = 'queue_state';
 
+// History Configuration
+export const MAX_HISTORY_ITEMS = 500;
+
 // Zoom Configuration
 export const FS_MAX_ZOOM = 10;
 export const FS_MIN_ZOOM = 1;

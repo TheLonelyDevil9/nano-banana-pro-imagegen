@@ -66,6 +66,15 @@ button {
     background: var(--color-queue-hover);
 }
 
+.btn-info {
+    background: var(--color-info);
+    color: var(--text-primary);
+}
+
+.btn-info:hover {
+    background: var(--color-info-hover);
+}
+
 .btn-refresh {
     background: var(--color-refresh);
     color: var(--text-primary);
@@ -281,6 +290,23 @@ input:checked+.slider:before {
     align-items: center;
     justify-content: center;
     z-index: 1;
+}
+
+/* Ref drag-to-reorder */
+.ref-thumb-wrap[draggable="true"] {
+    cursor: grab;
+}
+
+.ref-thumb-wrap.ref-dragging {
+    opacity: 0.4;
+}
+
+.ref-thumb-wrap.ref-drop-before {
+    box-shadow: -3px 0 0 0 var(--color-primary);
+}
+
+.ref-thumb-wrap.ref-drop-after {
+    box-shadow: 3px 0 0 0 var(--color-primary);
 }
 
 /* Prompt Wrapper */

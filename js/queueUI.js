@@ -19,6 +19,7 @@ import { getDirectoryInfo, selectOutputDirectory } from './filesystem.js';
 import { refImages, compressImage } from './references.js';
 import { getSavedPrompts } from './prompts.js';
 import { MAX_REFS, DEFAULT_QUEUE_DELAY_MS } from './config.js';
+import { loadHistoryEntry } from './history.js';
 
 // Prompt boxes state
 let promptBoxes = [];
@@ -1000,6 +1001,9 @@ function renderQueueItemList(items) {
                 ${item.status === 'failed' || item.status === 'cancelled' ? `
                     <button class="queue-item-btn retry-btn" onclick="retryQueueItem('${item.id}')" title="Retry this item">Retry</button>
                 ` : ''}
+                ${item.status === 'completed' && item.historyId ? `
+                    <button class="queue-item-btn info-btn" onclick="openGenerationDetails('${item.historyId}')" title="View generation details">Info</button>
+                ` : ''}
             </div>
         </div>
     `).join('');
@@ -1816,6 +1820,184 @@ export async function pasteRefsToBox(imageFiles) {
     showToast(`${newRefs.length} image${newRefs.length > 1 ? 's' : ''} pasted to ${label}`);
 }
 
+// ============================================
+// Generation Details Overlay
+// ============================================
+
+/**
+ * Open generation details overlay for a history entry
+ */
+export async function openGenerationDetails(historyId) {
+    if (!historyId) return;
+
+    const entry = await loadHistoryEntry(historyId);
+    if (!entry) {
+        showToast('History entry not found');
+        return;
+    }
+
+    // Remove any existing overlay
+    closeGenerationDetails();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'generation-details-overlay';
+    overlay.id = 'generationDetailsOverlay';
+    overlay.onclick = e => { if (e.target === overlay) closeGenerationDetails(); };
+
+    const refCount = entry.refImages?.length || 0;
+    const refsHtml = refCount > 0 ? `
+        <div class="generation-details-section">
+            <div class="generation-details-section-header">
+                <span>References (${refCount})</span>
+                <button class="btn-secondary btn-sm" onclick="downloadAllGenerationRefs()">Save All</button>
+            </div>
+            <div class="generation-details-refs">
+                ${entry.refImages.map((ref, i) => `
+                    <div class="generation-details-ref-item">
+                        <img src="${ref.data}" alt="Ref ${i + 1}">
+                        <button class="generation-details-ref-save" onclick="downloadGenerationRef(${i})" title="Save">Save</button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    ` : '';
+
+    const timeStr = entry.generationTimeMs
+        ? `${(entry.generationTimeMs / 1000).toFixed(1)}s`
+        : '';
+
+    overlay.innerHTML = `
+        <div class="generation-details-panel">
+            <div class="generation-details-header">
+                <h3>Generation Details</h3>
+                <button class="close-btn" onclick="closeGenerationDetails()">&times;</button>
+            </div>
+            <div class="generation-details-body">
+                <div class="generation-details-section">
+                    <div class="generation-details-section-header">
+                        <span>Prompt</span>
+                        <button class="btn-secondary btn-sm" onclick="copyGenerationPrompt()">Copy</button>
+                    </div>
+                    <div class="generation-details-prompt">${escapeHtml(entry.prompt)}</div>
+                </div>
+                <div class="generation-details-config">
+                    ${entry.config.model ? `<span class="config-badge">${escapeHtml(entry.config.model)}</span>` : ''}
+                    ${entry.config.ratio ? `<span class="config-badge">${entry.config.ratio}</span>` : ''}
+                    ${entry.config.resolution ? `<span class="config-badge">${entry.config.resolution}</span>` : ''}
+                    ${entry.config.thinkingBudget ? `<span class="config-badge">Think: ${entry.config.thinkingBudget}</span>` : ''}
+                    ${entry.config.searchEnabled ? `<span class="config-badge">Search</span>` : ''}
+                    ${timeStr ? `<span class="config-badge">${timeStr}</span>` : ''}
+                    ${entry.filename ? `<span class="config-badge" title="${escapeHtml(entry.filename)}">${escapeHtml(entry.filename)}</span>` : ''}
+                </div>
+                ${refsHtml}
+            </div>
+            <div class="generation-details-footer">
+                <button class="btn-primary" onclick="redoFromHistory('${entry.id}')">Redo</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Store entry for ref downloads
+    overlay._historyEntry = entry;
+
+    // Animate in
+    requestAnimationFrame(() => overlay.classList.add('open'));
+}
+
+/**
+ * Close generation details overlay
+ */
+export function closeGenerationDetails() {
+    const overlay = document.getElementById('generationDetailsOverlay');
+    if (overlay) {
+        overlay.classList.remove('open');
+        setTimeout(() => overlay.remove(), 200);
+    }
+}
+
+/**
+ * Copy prompt from the currently open details overlay
+ */
+function copyGenerationPrompt() {
+    const overlay = document.getElementById('generationDetailsOverlay');
+    if (!overlay?._historyEntry) return;
+    navigator.clipboard.writeText(overlay._historyEntry.prompt)
+        .then(() => showToast('Prompt copied'))
+        .catch(() => showToast('Copy failed'));
+}
+
+/**
+ * Download a single ref image from the open details overlay
+ */
+function downloadGenerationRef(index) {
+    const overlay = document.getElementById('generationDetailsOverlay');
+    const entry = overlay?._historyEntry;
+    if (!entry?.refImages?.[index]) return;
+
+    const dataUrl = entry.refImages[index].data;
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `ref_${index + 1}.png`;
+    link.click();
+}
+
+/**
+ * Download all ref images from the open details overlay
+ */
+function downloadAllGenerationRefs() {
+    const overlay = document.getElementById('generationDetailsOverlay');
+    const entry = overlay?._historyEntry;
+    if (!entry?.refImages?.length) return;
+
+    entry.refImages.forEach((ref, i) => {
+        setTimeout(() => {
+            const link = document.createElement('a');
+            link.href = ref.data;
+            link.download = `ref_${i + 1}.png`;
+            link.click();
+        }, i * 200);
+    });
+}
+
+/**
+ * Redo a generation from history — loads prompt + refs into main UI
+ */
+async function redoFromHistory(historyId) {
+    const entry = await loadHistoryEntry(historyId);
+    if (!entry) {
+        showToast('History entry not found');
+        return;
+    }
+
+    const { setRefImages, renderRefs } = await import('./references.js');
+    const { persistAllInputs } = await import('./persistence.js');
+    const { $: getEl } = await import('./ui.js');
+
+    // Load prompt
+    const promptEl = getEl('prompt');
+    if (promptEl) {
+        promptEl.value = entry.prompt;
+        promptEl.dispatchEvent(new Event('input'));
+    }
+
+    // Load refs
+    if (entry.refImages?.length > 0) {
+        const newRefs = entry.refImages.map((ref, i) => ({
+            id: Date.now() + i + Math.random(),
+            data: ref.data
+        }));
+        setRefImages(newRefs);
+        renderRefs();
+    }
+
+    persistAllInputs();
+    closeGenerationDetails();
+    toggleQueuePanel(false);
+    showToast('Loaded prompt & refs from history');
+}
+
 // Make functions globally available
 window.openQueueSetup = openQueueSetup;
 window.closeQueueSetup = closeQueueSetup;
@@ -1851,3 +2033,9 @@ window.fillBoxFromSaved = fillBoxFromSaved;
 window.openBulkSavedPromptPicker = openBulkSavedPromptPicker;
 window.confirmBulkSavedPrompts = confirmBulkSavedPrompts;
 window.closeBulkSavedPromptPicker = closeBulkSavedPromptPicker;
+window.openGenerationDetails = openGenerationDetails;
+window.closeGenerationDetails = closeGenerationDetails;
+window.copyGenerationPrompt = copyGenerationPrompt;
+window.downloadGenerationRef = downloadGenerationRef;
+window.downloadAllGenerationRefs = downloadAllGenerationRefs;
+window.redoFromHistory = redoFromHistory;

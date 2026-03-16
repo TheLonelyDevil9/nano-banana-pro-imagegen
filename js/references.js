@@ -133,7 +133,7 @@ export function renderRefs() {
         : '';
 
     refGrid.innerHTML = refImages.map((img, idx) =>
-        '<div class="ref-thumb-wrap">' +
+        '<div class="ref-thumb-wrap" draggable="true" data-ref-idx="' + idx + '">' +
         '<span class="ref-order-badge">' + (idx + 1) + '</span>' +
         '<img src="' + img.data + '" class="ref-thumb" onclick="viewRefImage(' + img.id + ')">' +
         '<button class="ref-remove" onclick="removeRef(' + img.id + ')">×</button>' +
@@ -141,6 +141,71 @@ export function renderRefs() {
     ).join('') + addBtn;
 
     refCount.textContent = refImages.length ? '(' + refImages.length + '/' + MAX_REFS + ')' : '';
+
+    // Setup reorder drag handlers on each thumb
+    setupRefReorderHandlers(refGrid);
+}
+
+// Drag-to-reorder state
+let dragSrcIdx = null;
+
+function setupRefReorderHandlers(grid) {
+    const thumbs = grid.querySelectorAll('.ref-thumb-wrap[draggable="true"]');
+
+    thumbs.forEach(thumb => {
+        thumb.addEventListener('dragstart', e => {
+            dragSrcIdx = parseInt(thumb.dataset.refIdx);
+            thumb.classList.add('ref-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', dragSrcIdx.toString());
+        });
+
+        thumb.addEventListener('dragend', () => {
+            thumb.classList.remove('ref-dragging');
+            grid.querySelectorAll('.ref-drop-before, .ref-drop-after').forEach(el => {
+                el.classList.remove('ref-drop-before', 'ref-drop-after');
+            });
+            dragSrcIdx = null;
+        });
+
+        thumb.addEventListener('dragover', e => {
+            if (dragSrcIdx === null) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            const targetIdx = parseInt(thumb.dataset.refIdx);
+            if (targetIdx === dragSrcIdx) return;
+
+            grid.querySelectorAll('.ref-drop-before, .ref-drop-after').forEach(el => {
+                el.classList.remove('ref-drop-before', 'ref-drop-after');
+            });
+
+            if (targetIdx < dragSrcIdx) {
+                thumb.classList.add('ref-drop-before');
+            } else {
+                thumb.classList.add('ref-drop-after');
+            }
+        });
+
+        thumb.addEventListener('dragleave', () => {
+            thumb.classList.remove('ref-drop-before', 'ref-drop-after');
+        });
+
+        thumb.addEventListener('drop', e => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const targetIdx = parseInt(thumb.dataset.refIdx);
+            if (dragSrcIdx === null || targetIdx === dragSrcIdx) return;
+
+            const [moved] = refImages.splice(dragSrcIdx, 1);
+            refImages.splice(targetIdx, 0, moved);
+
+            renderRefs();
+            saveRefImages();
+            showToast('Reordered');
+        });
+    });
 }
 
 // Remove reference image by ID
@@ -266,19 +331,24 @@ export function undoClearRefs() {
     }
 }
 
-// Setup drag and drop for reference images
+// Setup drag and drop for reference images (file drops from desktop)
 export function setupRefDragDrop() {
     const refSection = $('refGrid').parentElement;
 
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         refSection.addEventListener(eventName, e => {
+            // Don't interfere with internal reorder drags
+            if (dragSrcIdx !== null) return;
             e.preventDefault();
             e.stopPropagation();
         });
     });
 
     ['dragenter', 'dragover'].forEach(eventName => {
-        refSection.addEventListener(eventName, () => refSection.classList.add('dragover'));
+        refSection.addEventListener(eventName, () => {
+            if (dragSrcIdx !== null) return;
+            refSection.classList.add('dragover');
+        });
     });
 
     ['dragleave', 'drop'].forEach(eventName => {
@@ -286,6 +356,7 @@ export function setupRefDragDrop() {
     });
 
     refSection.addEventListener('drop', e => {
+        if (dragSrcIdx !== null) return;
         const files = e.dataTransfer.files;
         const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
         if (imageFiles.length > 0) {

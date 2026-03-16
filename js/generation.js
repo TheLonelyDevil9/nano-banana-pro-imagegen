@@ -14,6 +14,7 @@ import { saveImageToFilesystem, getDirectoryInfo } from './filesystem.js';
 // Generation state
 let currentImg = null;
 let currentFilename = null;
+let currentHistoryId = null;
 
 // Cached DOM elements
 let cachedElements = null;
@@ -37,7 +38,8 @@ function getCachedElements() {
             imageBox: $('imageBox'),
             placeholder: $('placeholder'),
             iterateBtn: $('iterateBtn'),
-            deleteBtn: $('deleteBtn')
+            deleteBtn: $('deleteBtn'),
+            infoBtn: $('infoBtn')
         };
     }
     return cachedElements;
@@ -47,6 +49,17 @@ function getCachedElements() {
 export function setCurrentImg(img) {
     currentImg = img;
     setCurrentImgRef(img);
+}
+
+// Set/get current history ID (set by queue after saving history entry)
+export function setCurrentHistoryId(id) {
+    currentHistoryId = id;
+    const el = getCachedElements();
+    if (el.infoBtn) el.infoBtn.disabled = !id;
+}
+
+export function getCurrentHistoryId() {
+    return currentHistoryId;
 }
 
 // Show image in the right panel (used by queue completion callback)
@@ -62,6 +75,7 @@ export function showImageResult(imageData, filename) {
     el.imageBox.classList.add('has-image');
     el.iterateBtn.disabled = false;
     el.deleteBtn.disabled = false;
+    if (el.infoBtn) el.infoBtn.disabled = !currentHistoryId;
     resetZoom();
 }
 
@@ -202,6 +216,7 @@ export function deleteCurrentImage() {
     // Clear display
     currentImg = null;
     currentFilename = null;
+    currentHistoryId = null;
     setCurrentImgRef(null);
     el.resultImg.src = '';
     el.resultImg.classList.add('hidden');
@@ -212,6 +227,7 @@ export function deleteCurrentImage() {
     el.groundingInfo.classList.add('hidden');
     el.iterateBtn.disabled = true;
     el.deleteBtn.disabled = true;
+    if (el.infoBtn) el.infoBtn.disabled = true;
     resetZoom();
     showToast('Cleared');
 }
@@ -230,6 +246,7 @@ export function clearAll() {
     if (currentImg) {
         currentImg = null;
         currentFilename = null;
+        currentHistoryId = null;
         setCurrentImgRef(null);
         el.resultImg.src = '';
         el.resultImg.classList.add('hidden');
@@ -240,6 +257,7 @@ export function clearAll() {
         el.groundingInfo.classList.add('hidden');
         el.iterateBtn.disabled = true;
         el.deleteBtn.disabled = true;
+        if (el.infoBtn) el.infoBtn.disabled = true;
         resetZoom();
     }
 
@@ -252,3 +270,8 @@ window.generate = generate;
 window.iterate = iterate;
 window.deleteCurrentImage = deleteCurrentImage;
 window.clearAll = clearAll;
+window.openCurrentImageDetails = async function () {
+    if (!currentHistoryId) return;
+    const { openGenerationDetails } = await import('./queueUI.js');
+    openGenerationDetails(currentHistoryId);
+};

@@ -4,6 +4,7 @@
  */
 
 import { setFilesystemDB } from './filesystem.js';
+import { MAX_HISTORY_ITEMS } from './config.js';
 
 // Database state
 let db = null;
@@ -11,7 +12,7 @@ let db = null;
 // Initialize IndexedDB
 export function initDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open('NanoBananaDB', 4);
+        const req = indexedDB.open('NanoBananaDB', 5);
         req.onerror = () => reject(req.error);
         req.onsuccess = () => {
             db = req.result;
@@ -48,6 +49,11 @@ export function initDB() {
             if (!database.objectStoreNames.contains('refSets')) {
                 const refSetsStore = database.createObjectStore('refSets', { keyPath: 'id' });
                 refSetsStore.createIndex('createdAt', 'createdAt');
+            }
+            // Generation history store (v5) - persistent prompt/config/refs per generation
+            if (!database.objectStoreNames.contains('generationHistory')) {
+                const ghStore = database.createObjectStore('generationHistory', { keyPath: 'id' });
+                ghStore.createIndex('createdAt', 'createdAt');
             }
         };
     });
@@ -133,6 +139,142 @@ export function clearAllQueueRefs() {
     return new Promise((resolve) => {
         const tx = db.transaction('queueRefs', 'readwrite');
         tx.objectStore('queueRefs').clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+    });
+}
+
+// ============================================
+// Generation History Storage (IndexedDB)
+// ============================================
+
+/**
+ * Save a generation history entry
+ */
+export function saveHistoryEntry(entry) {
+    if (!db) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('generationHistory', 'readwrite');
+        const store = tx.objectStore('generationHistory');
+        store.put(entry);
+        tx.oncomplete = () => resolve(entry);
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
+ * Load a single history entry by ID
+ */
+export function loadHistoryEntry(id) {
+    if (!db) return Promise.resolve(null);
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('generationHistory', 'readonly');
+        const store = tx.objectStore('generationHistory');
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+    });
+}
+
+/**
+ * Load N most recent history entries
+ */
+export function loadRecentHistory(limit = 50) {
+    if (!db) return Promise.resolve([]);
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('generationHistory', 'readonly');
+        const store = tx.objectStore('generationHistory');
+        const index = store.index('createdAt');
+        const results = [];
+
+        const req = index.openCursor(null, 'prev');
+        req.onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor && results.length < limit) {
+                results.push(cursor.value);
+                cursor.continue();
+            } else {
+                resolve(results);
+            }
+        };
+        req.onerror = () => resolve(results);
+    });
+}
+
+/**
+ * Look up a history entry by output filename
+ */
+export function getHistoryEntryByFilename(filename) {
+    if (!db || !filename) return Promise.resolve(null);
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('generationHistory', 'readonly');
+        const store = tx.objectStore('generationHistory');
+        const results = [];
+
+        store.openCursor().onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+                if (cursor.value.filename === filename) {
+                    resolve(cursor.value);
+                    return;
+                }
+                cursor.continue();
+            } else {
+                resolve(null);
+            }
+        };
+    });
+}
+
+/**
+ * Delete a single history entry
+ */
+export function deleteHistoryEntry(id) {
+    if (!db) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('generationHistory', 'readwrite');
+        tx.objectStore('generationHistory').delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+    });
+}
+
+/**
+ * Prune history to MAX_HISTORY_ITEMS, deleting oldest entries
+ */
+export function pruneHistory() {
+    if (!db) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        const tx = db.transaction('generationHistory', 'readwrite');
+        const store = tx.objectStore('generationHistory');
+        const index = store.index('createdAt');
+
+        const countReq = store.count();
+        countReq.onsuccess = () => {
+            const total = countReq.result;
+            if (total <= MAX_HISTORY_ITEMS) {
+                resolve();
+                return;
+            }
+
+            const toDelete = total - MAX_HISTORY_ITEMS;
+            let deleted = 0;
+            index.openCursor().onsuccess = e => {
+                const cursor = e.target.result;
+                if (cursor && deleted < toDelete) {
+                    cursor.delete();
+                    deleted++;
+                    cursor.continue();
+                }
+            };
+        };
+
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
     });

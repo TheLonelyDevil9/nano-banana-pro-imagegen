@@ -5,7 +5,7 @@
 
 import { DEFAULT_QUEUE_DELAY_MS, MAX_QUEUE_ITEMS, QUEUE_STORAGE_KEY } from './config.js';
 import { generateSingleImage, showImageResult } from './generation.js';
-import { saveQueueRefsMultiple, loadQueueRefsMultiple, deleteQueueRefsMultiple, clearAllQueueRefs } from './history.js';
+import { saveQueueRefsMultiple, loadQueueRefsMultiple, deleteQueueRefsMultiple, clearAllQueueRefs, saveHistoryEntry, pruneHistory } from './history.js';
 import { saveImageToFilesystem, getDirectoryInfo } from './filesystem.js';
 import { showToast, haptic, playNotificationSound, showConfirmDialog } from './ui.js';
 
@@ -377,8 +377,41 @@ async function processQueue() {
             // Show the last generated image in the right panel
             showImageResult(result.imageData, filename);
 
-            // Track generation time for ETA calculation
+            // Save generation history entry (before ref cleanup)
             const generationTime = item.completedAt - item.startedAt;
+            const historyId = 'gh_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            try {
+                await saveHistoryEntry({
+                    id: historyId,
+                    prompt: item.prompt,
+                    config: {
+                        model: item.config.model,
+                        ratio: item.config.ratio,
+                        resolution: item.config.resolution,
+                        thinkingBudget: item.config.thinkingBudget,
+                        searchEnabled: item.config.searchEnabled
+                    },
+                    refImages: item.refImages || [],
+                    filename: filename,
+                    batchName: item.batchName || '',
+                    name: item.name || '',
+                    createdAt: Date.now(),
+                    generationTimeMs: generationTime
+                });
+                item.historyId = historyId;
+                // Prune every 50 completions
+                if (queueState.completedCount % 50 === 0) {
+                    pruneHistory().catch(() => {});
+                }
+            } catch (e) {
+                console.error('[Queue] Failed to save history entry:', e);
+            }
+
+            // Update image panel with history ID
+            const { setCurrentHistoryId } = await import('./generation.js');
+            setCurrentHistoryId(historyId);
+
+            // Track generation time for ETA calculation
             queueState.generationTimes.push(generationTime);
             // Keep only last 20 times to avoid memory bloat
             if (queueState.generationTimes.length > 20) {
