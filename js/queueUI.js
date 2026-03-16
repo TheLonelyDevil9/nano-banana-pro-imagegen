@@ -1507,9 +1507,15 @@ export function updateQueueFab() {
     // Determine if queue just finished (not running, nothing pending/generating)
     const isComplete = !state.isRunning && !state.isPaused && stats.pending === 0 && stats.inProgress === 0;
 
-    // Update text — show checkmark when done, counter when active
+    // Update text — show checkmark when done, failure count if only failures remain, counter when active
     if (fabText) {
-        fabText.textContent = isComplete ? '✓' : `${stats.completed}/${stats.total}`;
+        if (isComplete && stats.failed > 0 && stats.completed === 0) {
+            fabText.textContent = `${stats.failed}✗`;
+        } else if (isComplete) {
+            fabText.textContent = '✓';
+        } else {
+            fabText.textContent = `${stats.completed}/${stats.total}`;
+        }
     }
 
     // Update progress bar
