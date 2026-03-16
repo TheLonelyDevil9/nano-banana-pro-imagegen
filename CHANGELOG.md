@@ -1,5 +1,76 @@
 # Changelog
 
+## [Unreleased] - 2026-03-16
+
+### Added
+- **Generation History**: Every generation now saves its full prompt, config, and reference images to IndexedDB
+  - New `generationHistory` store (IndexedDB v5) with auto-prune at 500 entries
+  - **Info button** on the image panel (between Iterate and Delete) opens a details overlay for the currently displayed image
+  - **Info button** on completed queue items in the queue panel
+  - **Details overlay** with full prompt (copyable), config badges (model, ratio, resolution, thinking, search, generation time, filename), reference image thumbnails with individual Save and Save All, and a Redo button
+  - **Redo** loads the prompt + references back into the main UI for quick re-generation
+  - History entries persist across sessions and browser restarts
+
+- **History Panel**: Persistent generation tracker accessible at all times
+  - Always-visible clock FAB (bottom-left corner) opens a slide-in history panel
+  - Lists the last 100 generations with prompt snippets, config badges, and relative timestamps (e.g. "2m ago", "3h ago")
+  - Click any entry to open the full details overlay
+  - Delete individual entries with hover-revealed × button
+  - Clear All button with confirmation dialog
+  - Completely independent of queue state — accessible even with no active queue
+
+- **Reference Image Drag-to-Reorder**: Control the order images are sent to the API
+  - Ref thumbnails are now draggable — grab and drop to change position
+  - Visual drop indicators (gold side shadows) show where the image will land
+  - Order persists to IndexedDB
+  - File drops from desktop still work without interference
+  - Order matters: Gemini processes reference images in array order, so "first image" / "second image" in prompts maps to thumbnail order
+
+### Changed
+- **Simplified UI**: Right panel action buttons now: Iterate, Info, Delete (was: Iterate, Delete)
+- IndexedDB bumped from v4 to v5 (adds `generationHistory` store, existing data preserved via migration)
+- `history.js` now exports generation history CRUD functions alongside existing queue ref functions
+- `queueUI.js` now imports from `history.js` for generation details and history panel
+- `generation.js` tracks `currentHistoryId` state alongside `currentImg` and `currentFilename`
+- `references.js` ref thumbnails render with `draggable="true"` and `data-ref-idx` attributes
+- Desktop file drop handler (`setupRefDragDrop`) now skips `preventDefault` during internal reorder drags
+- New CSS variables: `--color-info` (#0891b2) and `--color-info-hover` (#0e7490)
+
+### Technical Details
+
+**Generation History Schema:**
+```js
+{
+  id: 'gh_<timestamp>_<random>',
+  prompt: string,
+  config: { model, ratio, resolution, thinkingBudget, searchEnabled },
+  refImages: [{ data: 'data:image/jpeg;base64,...' }],
+  filename: string | null,
+  batchName: string,
+  name: string,
+  createdAt: timestamp,
+  generationTimeMs: number
+}
+```
+
+**Data Flow:**
+1. Queue completes a generation → builds history entry from queue item
+2. `saveHistoryEntry()` persists to IndexedDB (before `deleteQueueRefsMultiple`)
+3. `setCurrentHistoryId()` updates generation.js state → enables Info button
+4. Every 50 completions, `pruneHistory()` trims to 500 entries
+
+### Files Modified
+- `js/config.js` — Added `MAX_HISTORY_ITEMS = 500`
+- `js/history.js` — DB v5, `generationHistory` store, 6 new CRUD functions
+- `js/queue.js` — Saves history entry after each successful generation
+- `js/generation.js` — `currentHistoryId` state, Info button enable/disable, `openCurrentImageDetails` global
+- `js/queueUI.js` — Info button on completed queue items, generation details overlay, history panel with toggle/render/delete/clear
+- `js/references.js` — Drag-to-reorder handlers, desktop drop handler guard
+- `index.html` — Info button in actions bar, history FAB, history overlay + panel
+- `css/variables.css` — `--color-info`, `--color-info-hover`
+- `css/components.css` — `.btn-info`, ref drag styles, history FAB, history panel
+- `css/modals.css` — Generation details overlay styles
+
 ## [Unreleased] - 2026-03-15
 
 ### Changed

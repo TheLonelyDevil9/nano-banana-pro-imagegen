@@ -32,6 +32,7 @@ A powerful, feature-rich Gemini image generation client that runs entirely in yo
 - Up to **14 reference images** per generation
 - Auto-compression to 2560px max, JPEG at 0.85 quality (saves bandwidth)
 - Drag & drop, paste from clipboard, or click to upload
+- **Drag-to-reorder** — Grab and drop thumbnails to change image order (order maps to "first image", "second image" in prompts)
 - **Iterate** button adds output to references for style refinement
 - Fullscreen preview modal with arrow navigation and swipe gestures
 - Numbered order badges on thumbnails
@@ -100,9 +101,25 @@ my_batch/
 - Works for both single generations and batch queue
 - Delete files directly from history
 
-### History & Favorites
+### Generation History
 
-- Persistent storage via IndexedDB (database v4 with migration support)
+- **Persistent history panel** — Always accessible via the clock FAB (bottom-left), independent of queue state
+- Every generation saves its **full prompt, config, and reference images** to IndexedDB
+- History panel lists recent generations with prompt snippets, model, ratio, ref count, generation time, and relative timestamps
+- **Info button** on the image panel (between Iterate and Delete) opens the details overlay for the currently displayed image
+- **Info button** on completed queue items opens the same overlay
+- **Details overlay** shows:
+  - Full prompt (scrollable, monospace) with **Copy** button
+  - Config badges (model, ratio, resolution, thinking budget, search, generation time, filename)
+  - Reference image thumbnail grid with individual **Save** and **Save All** buttons
+  - **Redo** button — loads the prompt + references + config back into the main UI
+- Delete individual entries or **Clear All** with confirmation
+- Auto-prunes to 500 entries (oldest removed first)
+- Persists across sessions and browser restarts
+
+### Image History & Favorites
+
+- Persistent storage via IndexedDB (database v5 with migration support)
 - **Two storage modes**:
   - Full image storage (when no output folder is set)
   - Thumbnail-only storage (when output folder is set — full image loaded on demand)
@@ -224,14 +241,14 @@ nbpi/
     ├── models.js         # Model loading & caching
     ├── generation.js     # Image generation orchestration & stats
     ├── references.js     # Reference image handling & compression
-    ├── history.js        # IndexedDB operations & history UI
+    ├── history.js        # IndexedDB operations, image history UI, generation history CRUD
     ├── zoom.js           # Pinch-to-zoom, mouse wheel, pan controls
     ├── ui.js             # Toast, haptics, DOM helpers, prompt editor
     ├── persistence.js    # localStorage management for inputs
     ├── prompts.js        # Saved prompts management
     ├── filesystem.js     # File System Access API operations
     ├── queue.js          # Batch generation queue engine
-    └── queueUI.js        # Batch setup UI, prompt boxes, import/export
+    └── queueUI.js        # Batch setup UI, prompt boxes, import/export, generation details overlay, history panel
 ```
 
 ## Module Architecture
@@ -248,15 +265,16 @@ app.js (entry point)
 │   └── auth.js
 ├── generation.js ─────── Core generation, stats, download, copy
 │   ├── api.js ────────── API calls with retry + error parsing
-│   ├── references.js ─── Reference image state + compression
-│   ├── history.js ────── IndexedDB CRUD + history UI
+│   ├── references.js ─── Reference image state + compression + reorder
+│   ├── history.js ────── IndexedDB CRUD + image history + generation history
 │   └── filesystem.js ─── File System Access API operations
 ├── zoom.js ───────────── Fullscreen zoom (pinch, wheel, pan)
 ├── prompts.js ────────── Saved prompts CRUD + dropdown UI
 ├── queue.js ──────────── Queue engine (add, process, pause, resume)
 │   └── generation.js
-└── queueUI.js ────────── Prompt boxes, batch setup modal, import/export
+└── queueUI.js ────────── Prompt boxes, batch setup, import/export, generation details, history panel
     ├── queue.js
+    ├── history.js
     ├── references.js
     └── filesystem.js
 ```
@@ -282,6 +300,7 @@ All data stays in your browser — nothing is sent to any server except the Gemi
 | Input State | localStorage | Prompt text, aspect ratio, resolution, thinking budget |
 | Reference Images | IndexedDB | Compressed base64 images (migrated from localStorage) |
 | Generated Images | IndexedDB | Full images or thumbnails (depends on filesystem mode) |
+| Generation History | IndexedDB | Prompt, config, ref images, filename per generation (up to 500) |
 | Saved Prompts | IndexedDB | User-saved prompt library |
 | Directory Handle | IndexedDB | Output folder handle for filesystem access |
 | Queue State | localStorage | Pending/completed queue items for session recovery |
@@ -299,6 +318,7 @@ All data stays in your browser — nothing is sent to any server except the Gemi
 | `MAX_QUEUE_ITEMS` | 100 | Maximum items in batch queue |
 | `MAX_VARIATIONS_PER_PROMPT` | 10 | Maximum variations per prompt box |
 | `DEFAULT_QUEUE_DELAY_MS` | 3000 | Default delay between batch generations |
+| `MAX_HISTORY_ITEMS` | 500 | Maximum generation history entries before auto-prune |
 | `HISTORY_PAGE_SIZE` | 20 | Items per infinite scroll page |
 | `MAX_CONVERSATION_TURNS` | 10 | Max conversation turns for generation |
 | `FS_MAX_ZOOM` | 10x | Maximum zoom level in fullscreen |
