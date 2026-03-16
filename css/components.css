@@ -1887,6 +1887,172 @@ input:checked+.slider:before {
 }
 
 /* ==========================================================================
+   History FAB
+   ========================================================================== */
+
+.history-fab {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 2px solid var(--color-info);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    color: var(--color-info);
+}
+
+.history-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .history-fab {
+        bottom: 80px;
+        left: 16px;
+        width: 40px;
+        height: 40px;
+    }
+
+    .history-fab svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* ==========================================================================
+   History Panel
+   ========================================================================== */
+
+.history-panel {
+    position: fixed;
+    top: 0;
+    left: -420px;
+    width: 400px;
+    max-width: 90vw;
+    height: 100vh;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-default);
+    z-index: var(--z-panel);
+    display: flex;
+    flex-direction: column;
+    transition: left var(--transition-normal);
+}
+
+.history-panel.open {
+    left: 0;
+}
+
+.history-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--border-default);
+    gap: var(--spacing-sm);
+}
+
+.history-panel-header h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    white-space: nowrap;
+}
+
+.history-panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.history-panel-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+}
+
+.history-empty {
+    text-align: center;
+    color: var(--text-dim);
+    padding: var(--spacing-xl);
+    font-size: var(--font-size-md);
+}
+
+.history-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast);
+}
+
+.history-item:hover {
+    background: var(--bg-hover);
+}
+
+.history-item-main {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.history-item-prompt {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.history-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-top: 4px;
+    font-size: var(--font-size-xs);
+    color: var(--text-dim);
+}
+
+.history-item-meta span {
+    background: var(--bg-elevated);
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.history-item-delete {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.history-item:hover .history-item-delete {
+    opacity: 1;
+}
+
+.history-item-delete:hover {
+    color: var(--color-error);
+}
+
+/* ==========================================================================
    Confirmation Dialog
    ========================================================================== */
 

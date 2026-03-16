@@ -19,7 +19,7 @@ import { getDirectoryInfo, selectOutputDirectory } from './filesystem.js';
 import { refImages, compressImage } from './references.js';
 import { getSavedPrompts } from './prompts.js';
 import { MAX_REFS, DEFAULT_QUEUE_DELAY_MS } from './config.js';
-import { loadHistoryEntry } from './history.js';
+import { loadHistoryEntry, loadRecentHistory, deleteHistoryEntry } from './history.js';
 
 // Prompt boxes state
 let promptBoxes = [];
@@ -1998,6 +1998,122 @@ async function redoFromHistory(historyId) {
     showToast('Loaded prompt & refs from history');
 }
 
+// ============================================
+// History Panel
+// ============================================
+
+let historyPanelOpen = false;
+
+/**
+ * Toggle the history panel open/closed
+ */
+export function toggleHistoryPanel(forceOpen = null) {
+    const panel = $('historyPanel');
+    const overlay = $('historyOverlay');
+    if (!panel) return;
+
+    historyPanelOpen = forceOpen !== null ? forceOpen : !historyPanelOpen;
+
+    panel.classList.toggle('open', historyPanelOpen);
+    if (overlay) overlay.classList.toggle('open', historyPanelOpen);
+
+    if (historyPanelOpen) {
+        renderHistoryPanel();
+    }
+}
+
+/**
+ * Render the history panel list from IndexedDB
+ */
+export async function renderHistoryPanel() {
+    const list = $('historyPanelList');
+    if (!list) return;
+
+    list.innerHTML = '<div class="history-empty">Loading...</div>';
+
+    const entries = await loadRecentHistory(100);
+
+    if (entries.length === 0) {
+        list.innerHTML = '<div class="history-empty">No generations yet</div>';
+        return;
+    }
+
+    list.innerHTML = entries.map(entry => {
+        const timeAgo = formatTimeAgo(entry.createdAt);
+        const refCount = entry.refImages?.length || 0;
+        const promptSnippet = escapeHtml(entry.prompt.slice(0, 60)) + (entry.prompt.length > 60 ? '...' : '');
+
+        return `
+            <div class="history-item" data-history-id="${entry.id}">
+                <div class="history-item-main" onclick="openGenerationDetails('${entry.id}')">
+                    <div class="history-item-prompt">${promptSnippet}</div>
+                    <div class="history-item-meta">
+                        <span>${entry.config?.model?.replace('gemini-', '').replace('-image-preview', '') || '?'}</span>
+                        ${entry.config?.ratio ? `<span>${entry.config.ratio}</span>` : ''}
+                        ${refCount > 0 ? `<span>${refCount} ref${refCount > 1 ? 's' : ''}</span>` : ''}
+                        ${entry.generationTimeMs ? `<span>${(entry.generationTimeMs / 1000).toFixed(1)}s</span>` : ''}
+                        <span>${timeAgo}</span>
+                    </div>
+                </div>
+                <button class="history-item-delete" onclick="deleteHistoryItem('${entry.id}')" title="Delete">&times;</button>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Delete a single history entry and re-render
+ */
+async function deleteHistoryItem(id) {
+    await deleteHistoryEntry(id);
+    renderHistoryPanel();
+    showToast('Entry deleted');
+}
+
+/**
+ * Clear all generation history
+ */
+async function clearAllHistory() {
+    const { showConfirmDialog } = await import('./ui.js');
+    const confirmed = await showConfirmDialog({
+        title: 'Clear History',
+        message: 'Clear all generation history? This cannot be undone.',
+        confirmText: 'Clear All',
+        danger: true
+    });
+    if (!confirmed) return;
+
+    const { getDB } = await import('./history.js');
+    const db = getDB();
+    if (!db) return;
+
+    return new Promise(resolve => {
+        const tx = db.transaction('generationHistory', 'readwrite');
+        tx.objectStore('generationHistory').clear();
+        tx.oncomplete = () => {
+            renderHistoryPanel();
+            showToast('History cleared');
+            resolve();
+        };
+        tx.onerror = () => resolve();
+    });
+}
+
+/**
+ * Format a timestamp as relative time (e.g. "2m ago", "3h ago", "1d ago")
+ */
+function formatTimeAgo(timestamp) {
+    const diff = Date.now() - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
 // Make functions globally available
 window.openQueueSetup = openQueueSetup;
 window.closeQueueSetup = closeQueueSetup;
@@ -2039,3 +2155,6 @@ window.copyGenerationPrompt = copyGenerationPrompt;
 window.downloadGenerationRef = downloadGenerationRef;
 window.downloadAllGenerationRefs = downloadAllGenerationRefs;
 window.redoFromHistory = redoFromHistory;
+window.toggleHistoryPanel = toggleHistoryPanel;
+window.deleteHistoryItem = deleteHistoryItem;
+window.clearAllHistory = clearAllHistory;

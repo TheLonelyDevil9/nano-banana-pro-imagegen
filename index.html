@@ -586,6 +586,30 @@
     <span class="queue-fab-text" id="queueFabText">0/0</span>
   </div>
 
+  <!-- History FAB (always visible) -->
+  <div class="history-fab" id="historyFab" onclick="toggleHistoryPanel()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  </div>
+
+  <!-- History Overlay -->
+  <div class="overlay" id="historyOverlay" onclick="toggleHistoryPanel()"></div>
+
+  <!-- History Panel -->
+  <div class="history-panel" id="historyPanel">
+    <div class="history-panel-header">
+      <h2>Generation History</h2>
+      <div class="history-panel-header-actions">
+        <button class="btn-cancel btn-sm" onclick="clearAllHistory()" title="Clear all history">Clear All</button>
+        <button class="close-btn" onclick="toggleHistoryPanel()">×</button>
+      </div>
+    </div>
+    <div class="history-panel-list" id="historyPanelList">
+      <div class="history-empty">No generations yet</div>
+    </div>
+  </div>
+
   <!-- JavaScript Modules -->
   <script type="module" src="js/app.js"></script>
 </body>
