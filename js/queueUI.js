@@ -56,6 +56,8 @@ export function initQueueUI() {
         boxRefInput.addEventListener('change', handleBoxRefInput);
     }
 
+    setupBoxDropZoneDelegation();
+
     // Initial render
     renderQueuePanel();
     updateDirectoryDisplay();
@@ -731,8 +733,7 @@ function renderPromptBoxes() {
         container.dataset.dragSetup = 'true';
     }
 
-    // Setup drop zones for ref images (must run after every render since zones are recreated)
-    setupBoxDropZones();
+    setupBoxDropZoneDelegation();
 }
 
 /**
@@ -1667,97 +1668,103 @@ export function getActiveDropTarget() {
     return activeDropTargetId;
 }
 
-/**
- * Setup drag-and-drop handlers on each box's drop zone
- * Called after every renderPromptBoxes since zones are recreated
- */
-function setupBoxDropZones() {
-    const zones = document.querySelectorAll('.box-drop-zone');
+function setupBoxDropZoneDelegation() {
+    const container = $('promptBoxesContainer');
+    if (!container || container.dataset.dropZoneDelegationSetup === 'true') return;
 
-    zones.forEach(zone => {
-        const boxId = zone.dataset.boxId;
+    container.addEventListener('click', e => {
+        const zone = e.target.closest('.box-drop-zone');
+        if (!zone) return;
 
-        // Click to open file picker (only when clicking the placeholder or the zone itself, not child buttons)
-        zone.addEventListener('click', e => {
-            if (e.target === zone || e.target.classList.contains('box-drop-zone-placeholder')) {
-                setActiveDropTarget(boxId);
-                openBoxRefPicker(boxId);
-            }
-        });
-
-        // Set as paste target on any interaction
-        zone.addEventListener('mousedown', () => {
+        if (e.target === zone || e.target.classList.contains('box-drop-zone-placeholder')) {
+            const boxId = zone.dataset.boxId;
             setActiveDropTarget(boxId);
-        });
-
-        // Drag enter/over — accept image files
-        zone.addEventListener('dragenter', e => {
-            // Ignore box reorder drags (they set text/plain with box ID)
-            if (draggedBoxId) return;
-            e.preventDefault();
-            e.stopPropagation();
-            zone.classList.add('drag-over');
-            setActiveDropTarget(boxId);
-        });
-
-        zone.addEventListener('dragover', e => {
-            if (draggedBoxId) return;
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'copy';
-        });
-
-        zone.addEventListener('dragleave', e => {
-            // Only remove if leaving the zone itself (not entering a child)
-            if (!zone.contains(e.relatedTarget)) {
-                zone.classList.remove('drag-over');
-            }
-        });
-
-        // Drop — process image files
-        zone.addEventListener('drop', async e => {
-            zone.classList.remove('drag-over');
-
-            // Ignore box reorder drags
-            if (draggedBoxId) return;
-
-            const files = e.dataTransfer?.files;
-            if (!files || files.length === 0) return;
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-            if (imageFiles.length === 0) return;
-
-            const box = promptBoxes.find(b => b.id === boxId);
-            if (!box) return;
-
-            if (!box.refImages) box.refImages = [];
-
-            let addedCount = 0;
-            for (const file of imageFiles) {
-                if (box.refImages.length >= MAX_REFS) {
-                    showToast(`Maximum ${MAX_REFS} reference images reached`);
-                    break;
-                }
-                try {
-                    const dataUrl = await fileToDataUrl(file);
-                    const compressed = await compressImage(dataUrl);
-                    box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
-                    addedCount++;
-                } catch (err) {
-                    console.error('Error processing dropped file:', err);
-                }
-            }
-
-            if (addedCount > 0) {
-                renderPromptBoxes();
-                const idx = promptBoxes.findIndex(b => b.id === boxId) + 1;
-                showToast(`${addedCount} image${addedCount > 1 ? 's' : ''} added to Prompt ${idx}`);
-            }
-        });
+            openBoxRefPicker(boxId);
+        }
     });
+
+    // Preserve existing behavior: any interaction inside a zone marks it as the active paste target.
+    container.addEventListener('mousedown', e => {
+        const zone = e.target.closest('.box-drop-zone');
+        if (!zone) return;
+        setActiveDropTarget(zone.dataset.boxId);
+    });
+
+    container.addEventListener('dragenter', e => {
+        const zone = e.target.closest('.box-drop-zone');
+        if (!zone || draggedBoxId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        zone.classList.add('drag-over');
+        setActiveDropTarget(zone.dataset.boxId);
+    });
+
+    container.addEventListener('dragover', e => {
+        const zone = e.target.closest('.box-drop-zone');
+        if (!zone || draggedBoxId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+
+    container.addEventListener('dragleave', e => {
+        const zone = e.target.closest('.box-drop-zone');
+        if (!zone) return;
+        if (!zone.contains(e.relatedTarget)) {
+            zone.classList.remove('drag-over');
+        }
+    });
+
+    container.addEventListener('drop', async e => {
+        const zone = e.target.closest('.box-drop-zone');
+        if (!zone) return;
+
+        zone.classList.remove('drag-over');
+
+        if (draggedBoxId) return;
+
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        await addDroppedRefsToBox(zone.dataset.boxId, files);
+    });
+
+    container.dataset.dropZoneDelegationSetup = 'true';
+}
+
+async function addDroppedRefsToBox(boxId, files) {
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+
+    const box = promptBoxes.find(b => b.id === boxId);
+    if (!box) return;
+
+    if (!box.refImages) box.refImages = [];
+
+    let addedCount = 0;
+    for (const file of imageFiles) {
+        if (box.refImages.length >= MAX_REFS) {
+            showToast(`Maximum ${MAX_REFS} reference images reached`);
+            break;
+        }
+        try {
+            const dataUrl = await fileToDataUrl(file);
+            const compressed = await compressImage(dataUrl);
+            box.refImages.push({ id: Date.now() + Math.random(), data: compressed });
+            addedCount++;
+        } catch (err) {
+            console.error('Error processing dropped file:', err);
+        }
+    }
+
+    if (addedCount > 0) {
+        renderPromptBoxes();
+        const idx = promptBoxes.findIndex(b => b.id === boxId) + 1;
+        showToast(`${addedCount} image${addedCount > 1 ? 's' : ''} added to Prompt ${idx}`);
+    }
 }
 
 /**

@@ -5,7 +5,7 @@
 
 import { $, showToast, updatePlaceholder } from './ui.js';
 import { generateWithRetry, parseApiError } from './api.js';
-import { refImages, renderRefs } from './references.js';
+import { refImages, renderRefs, compressImage, saveRefImages } from './references.js';
 import { saveLastModel, persistAllInputs } from './persistence.js';
 import { resetZoom, setCurrentImgRef } from './zoom.js';
 import { MAX_REFS } from './config.js';
@@ -196,16 +196,29 @@ export async function generate() {
 }
 
 // Iterate (add current image to references)
-export function iterate() {
+export async function iterate() {
     if (!currentImg) return;
+    const el = getCachedElements();
     if (refImages.length >= MAX_REFS) {
         showToast('Maximum ' + MAX_REFS + ' reference images reached');
         return;
     }
-    refImages.push({ id: Date.now() + Math.random(), data: currentImg });
-    renderRefs();
-    persistAllInputs();
-    showToast('Added to references');
+
+    el.iterateBtn.disabled = true;
+
+    try {
+        const compressed = await compressImage(currentImg);
+        refImages.push({ id: Date.now() + Math.random(), data: compressed });
+        renderRefs();
+        await saveRefImages();
+        persistAllInputs();
+        showToast('Added to references');
+    } catch (err) {
+        console.error('Failed to add iterated image to references:', err);
+        showToast('Failed to add image to references');
+    } finally {
+        el.iterateBtn.disabled = !currentImg;
+    }
 }
 
 // Clear current image from display (file remains on disk)

@@ -29,8 +29,11 @@ async function init() {
     restoreCollapsibleStates();
     setupInputPersistence();
 
+    // Initialize database before any IndexedDB-backed restore paths
+    await initDB();
+
     // Load reference images
-    loadRefImages();
+    await loadRefImages();
 
     // Initialize UI elements
     updateCharCounter();
@@ -98,8 +101,6 @@ async function init() {
     // Setup zoom handlers
     setupZoomHandlers();
 
-    // Initialize database
-    await initDB();
     loadSavedPrompts();
 
     // Initialize filesystem module

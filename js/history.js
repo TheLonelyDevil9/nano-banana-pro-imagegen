@@ -8,11 +8,12 @@ import { MAX_HISTORY_ITEMS } from './config.js';
 
 // Database state
 let db = null;
+const DB_VERSION = 6;
 
 // Initialize IndexedDB
 export function initDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open('NanoBananaDB', 5);
+        const req = indexedDB.open('NanoBananaDB', DB_VERSION);
         req.onerror = () => reject(req.error);
         req.onsuccess = () => {
             db = req.result;
@@ -54,6 +55,15 @@ export function initDB() {
             if (!database.objectStoreNames.contains('generationHistory')) {
                 const ghStore = database.createObjectStore('generationHistory', { keyPath: 'id' });
                 ghStore.createIndex('createdAt', 'createdAt');
+                ghStore.createIndex('filename', 'filename');
+            } else {
+                const ghStore = e.target.transaction.objectStore('generationHistory');
+                if (!ghStore.indexNames.contains('createdAt')) {
+                    ghStore.createIndex('createdAt', 'createdAt');
+                }
+                if (!ghStore.indexNames.contains('filename')) {
+                    ghStore.createIndex('filename', 'filename');
+                }
             }
         };
     });
@@ -212,21 +222,10 @@ export function getHistoryEntryByFilename(filename) {
 
     return new Promise((resolve) => {
         const tx = db.transaction('generationHistory', 'readonly');
-        const store = tx.objectStore('generationHistory');
-        const results = [];
-
-        store.openCursor().onsuccess = e => {
-            const cursor = e.target.result;
-            if (cursor) {
-                if (cursor.value.filename === filename) {
-                    resolve(cursor.value);
-                    return;
-                }
-                cursor.continue();
-            } else {
-                resolve(null);
-            }
-        };
+        const index = tx.objectStore('generationHistory').index('filename');
+        const req = index.get(filename);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
     });
 }
 
