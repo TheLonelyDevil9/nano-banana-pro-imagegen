@@ -8,7 +8,7 @@ import { MAX_HISTORY_ITEMS } from './config.js';
 
 // Database state
 let db = null;
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 // Initialize IndexedDB
 export function initDB() {
@@ -63,6 +63,16 @@ export function initDB() {
                 }
                 if (!ghStore.indexNames.contains('filename')) {
                     ghStore.createIndex('filename', 'filename');
+                }
+            }
+            // Profiles store (v7) - full local app snapshots per named profile
+            if (!database.objectStoreNames.contains('profiles')) {
+                const profilesStore = database.createObjectStore('profiles', { keyPath: 'name' });
+                profilesStore.createIndex('updatedAt', 'updatedAt');
+            } else {
+                const profilesStore = e.target.transaction.objectStore('profiles');
+                if (!profilesStore.indexNames.contains('updatedAt')) {
+                    profilesStore.createIndex('updatedAt', 'updatedAt');
                 }
             }
         };

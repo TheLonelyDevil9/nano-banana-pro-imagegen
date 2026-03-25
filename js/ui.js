@@ -143,12 +143,12 @@ export function toggleCollapsible(id) {
 
 // Restore collapsible states from localStorage
 export function restoreCollapsibleStates() {
-    ['authCollapsible', 'advancedCollapsible', 'settingsCollapsible', 'safetyCollapsible'].forEach(id => {
-        const el = $(id);
-        if (el && localStorage.getItem('collapsed_' + id) === 'true') {
-            el.classList.add('collapsed');
-        } else if (el && localStorage.getItem('collapsed_' + id) === 'false') {
-            el.classList.remove('collapsed');
+    document.querySelectorAll('.collapsible[id]').forEach(collapsible => {
+        const id = collapsible.id;
+        if (localStorage.getItem('collapsed_' + id) === 'true') {
+            collapsible.classList.add('collapsed');
+        } else if (localStorage.getItem('collapsed_' + id) === 'false') {
+            collapsible.classList.remove('collapsed');
         }
     });
 }

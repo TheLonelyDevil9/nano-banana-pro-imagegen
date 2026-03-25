@@ -9,11 +9,44 @@ import { showToast } from './ui.js';
 let directoryHandle = null;
 let db = null;
 
+function isLoopbackHost(hostname) {
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+export function getFileSystemSupportDetails() {
+    const hasPickerApi = 'showDirectoryPicker' in window;
+    const isPotentiallyTrustworthy = window.isSecureContext ||
+        window.location.protocol === 'https:' ||
+        isLoopbackHost(window.location.hostname);
+
+    if (hasPickerApi) {
+        return {
+            supported: true,
+            reason: 'supported',
+            message: ''
+        };
+    }
+
+    if (!isPotentiallyTrustworthy) {
+        return {
+            supported: false,
+            reason: 'insecure-context',
+            message: 'Folder selection requires localhost, 127.0.0.1, or HTTPS. Images will download instead on this origin.'
+        };
+    }
+
+    return {
+        supported: false,
+        reason: 'unsupported-browser',
+        message: 'This browser does not support File System Access. Images will download instead.'
+    };
+}
+
 /**
  * Check if File System Access API is supported
  */
 export function isFileSystemSupported() {
-    return 'showDirectoryPicker' in window;
+    return getFileSystemSupportDetails().supported;
 }
 
 /**
@@ -37,8 +70,9 @@ export function getDirectoryInfo() {
  * Select output directory via picker
  */
 export async function selectOutputDirectory() {
-    if (!isFileSystemSupported()) {
-        showToast('File System Access not supported in this browser');
+    const support = getFileSystemSupportDetails();
+    if (!support.supported) {
+        showToast(support.message);
         return false;
     }
 
@@ -315,6 +349,8 @@ export async function deleteFromFilesystem(filename) {
  * Update directory UI elements
  */
 function updateDirectoryUI() {
+    updateFileSystemSupportUI();
+
     const nameEl = document.getElementById('outputDirName');
     const statusEl = document.getElementById('outputDirStatus');
     const clearBtn = document.getElementById('clearDirBtn');
@@ -335,6 +371,22 @@ function updateDirectoryUI() {
 
     if (selectBtn) {
         selectBtn.textContent = directoryHandle ? 'Change' : 'Select Folder';
+    }
+}
+
+export function updateFileSystemSupportUI() {
+    const support = getFileSystemSupportDetails();
+    const warningEl = document.getElementById('fsSupportWarning');
+    const selectBtn = document.getElementById('selectDirBtn');
+
+    if (warningEl) {
+        warningEl.style.display = support.supported ? 'none' : 'block';
+        warningEl.textContent = support.message;
+    }
+
+    if (selectBtn) {
+        selectBtn.disabled = !support.supported;
+        selectBtn.title = support.supported ? '' : support.message;
     }
 }
 

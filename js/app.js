@@ -11,10 +11,10 @@ import { initDB } from './history.js';
 import { setupZoomHandlers } from './zoom.js';
 import { generate } from './generation.js';
 import { loadSavedPrompts, isDropdownOpen, closePromptsDropdown, saveCurrentPrompt } from './prompts.js';
-import { isFileSystemSupported, restoreDirectoryHandle } from './filesystem.js';
+import { isFileSystemSupported, restoreDirectoryHandle, updateFileSystemSupportUI } from './filesystem.js';
 import { restoreQueueState, hasResumableQueue } from './queue.js';
 import { initQueueUI, handleBatchButtonClick, toggleQueuePanel, closeQueueSetup } from './queueUI.js';
-import { saveProfile, loadProfile, listProfiles, deleteProfile, exportProfile, importProfile, getActiveProfile } from './profiles.js';
+import { initProfiles, saveProfile, loadProfile, listProfiles, deleteProfile, exportProfile, importProfile, getActiveProfile } from './profiles.js';
 
 // Initialize application
 async function init() {
@@ -31,9 +31,11 @@ async function init() {
 
     // Initialize database before any IndexedDB-backed restore paths
     await initDB();
+    await initProfiles();
 
     // Load reference images
     await loadRefImages();
+    await loadSavedPrompts();
 
     // Initialize UI elements
     updateCharCounter();
@@ -101,20 +103,13 @@ async function init() {
     // Setup zoom handlers
     setupZoomHandlers();
 
-    loadSavedPrompts();
-
     // Initialize filesystem module
+    updateFileSystemSupportUI();
     if (isFileSystemSupported()) {
         const restored = await restoreDirectoryHandle();
         if (restored === 'needs-permission') {
             // Handle permission request on user gesture
             console.log('Directory handle restored, needs permission on next action');
-        }
-    } else {
-        // Show warning that File System Access is not supported
-        const warningEl = $('fsSupportWarning');
-        if (warningEl) {
-            warningEl.style.display = 'block';
         }
     }
 
@@ -125,7 +120,7 @@ async function init() {
     initQueueUI();
 
     // Initialize profile UI
-    updateProfileDropdown();
+    await updateProfileDropdown();
 
     // Check for resumable queue
     if (savedQueue && hasResumableQueue()) {
@@ -202,11 +197,11 @@ async function init() {
 /**
  * Update profile dropdown with available profiles
  */
-function updateProfileDropdown() {
+async function updateProfileDropdown() {
     const select = $('profileSelect');
     if (!select) return;
 
-    const profiles = listProfiles();
+    const profiles = await listProfiles();
     const activeProfile = getActiveProfile();
 
     // Clear and rebuild options
@@ -225,7 +220,7 @@ function updateProfileDropdown() {
 /**
  * Save current settings as profile
  */
-window.saveCurrentProfile = function() {
+window.saveCurrentProfile = async function() {
     const nameInput = $('profileName');
     const name = nameInput.value.trim();
 
@@ -234,16 +229,16 @@ window.saveCurrentProfile = function() {
         return;
     }
 
-    if (saveProfile(name)) {
+    if (await saveProfile(name)) {
         nameInput.value = '';
-        updateProfileDropdown();
+        await updateProfileDropdown();
     }
 };
 
 /**
  * Load selected profile
  */
-window.loadSelectedProfile = function() {
+window.loadSelectedProfile = async function() {
     const select = $('profileSelect');
     const name = select.value;
 
@@ -252,7 +247,7 @@ window.loadSelectedProfile = function() {
         return;
     }
 
-    if (loadProfile(name)) {
+    if (await loadProfile(name)) {
         // Reload the page to apply all settings
         location.reload();
     }
@@ -261,7 +256,7 @@ window.loadSelectedProfile = function() {
 /**
  * Delete selected profile
  */
-window.deleteSelectedProfile = function() {
+window.deleteSelectedProfile = async function() {
     const select = $('profileSelect');
     const name = select.value;
 
@@ -271,8 +266,8 @@ window.deleteSelectedProfile = function() {
     }
 
     if (confirm(`Delete profile "${name}"?`)) {
-        if (deleteProfile(name)) {
-            updateProfileDropdown();
+        if (await deleteProfile(name)) {
+            await updateProfileDropdown();
         }
     }
 };
@@ -280,7 +275,7 @@ window.deleteSelectedProfile = function() {
 /**
  * Export selected profile
  */
-window.exportSelectedProfile = function() {
+window.exportSelectedProfile = async function() {
     const select = $('profileSelect');
     const name = select.value;
 
@@ -289,7 +284,7 @@ window.exportSelectedProfile = function() {
         return;
     }
 
-    exportProfile(name);
+    await exportProfile(name);
 };
 
 /**
@@ -300,7 +295,7 @@ window.importProfileFile = async function(event) {
     if (!file) return;
 
     if (await importProfile(file)) {
-        updateProfileDropdown();
+        await updateProfileDropdown();
     }
 
     // Clear file input
